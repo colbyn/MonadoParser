@@ -1,7 +1,7 @@
 // The Swift Programming Language
 // https://docs.swift.org/swift-book
 import PrettyTree
-import ExtraUtils
+import ExtraMonadoUtils
 
 /// The `Parser` struct encapsulates a parsing operation. It's a generic type that takes an input of type `ParserState` and produces an output wrapped in `Output`, which contains both the result of the parsing operation and the updated state.
 ///

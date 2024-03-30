@@ -10,16 +10,16 @@ let package = Package(
         .library(name: "Monado", targets: ["Monado"]),
         .library(name: "PrettyTree", targets: ["PrettyTree"]),
         .library(name: "Markup", targets: ["Markup"]),
-        .library(name: "ExtraUtils", targets: ["ExtraUtils"]),
+        .library(name: "ExtraMonadoUtils", targets: ["ExtraMonadoUtils"]),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(name: "PrettyTree"),
-        .target(name: "ExtraUtils"),
-        .target(name: "Monado", dependencies: [ "PrettyTree", "ExtraUtils" ]),
-        .target(name: "Markup", dependencies: [ "Monado", "ExtraUtils" ]),
-        .executableTarget(name: "dev", dependencies: [ "Monado", "Markup", "ExtraUtils" ]),
+        .target(name: "ExtraMonadoUtils"),
+        .target(name: "Monado", dependencies: [ "PrettyTree", "ExtraMonadoUtils" ]),
+        .target(name: "Markup", dependencies: [ "Monado", "ExtraMonadoUtils" ]),
+        .executableTarget(name: "dev", dependencies: [ "Monado", "Markup", "ExtraMonadoUtils" ]),
 //        .testTarget(name: "MonadoParserTests", dependencies: ["MonadoParser"]),
     ]
 )
