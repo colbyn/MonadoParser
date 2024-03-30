@@ -127,8 +127,11 @@ extension Markdown.Emphasis {
         let p1 = TapeParser.pop("***").and(inner.and(TapeParser.pop("***")))
         let p2 = TapeParser.pop("**").and(inner.and(TapeParser.pop("**")))
         let p3 = TapeParser.pop("*").and(inner.and(TapeParser.pop("*")))
+        let p4 = TapeParser.pop("___").and(inner.and(TapeParser.pop("___")))
+        let p5 = TapeParser.pop("__").and(inner.and(TapeParser.pop("__")))
+        let p6 = TapeParser.pop("_").and(inner.and(TapeParser.pop("_")))
         let parser = Parser
-            .options([ p1, p2, p3 ])
+            .options([ p1, p2, p3, p4, p5, p6 ])
             .map { Markdown.Emphasis( open: $0.a, content: $0.b.a, close: $0.b.b) }
         return parser.beforeAfterDebugLabels(before: "bgn:emphasis", after: "end:emphasis")
     }
