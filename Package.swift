@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "Monado", targets: ["Monado"]),
         .library(name: "PrettyTree", targets: ["PrettyTree"]),
         .library(name: "Markup", targets: ["Markup"]),
+        .library(name: "Markdown", targets: ["Markdown"]),
         .library(name: "ExtraMonadoUtils", targets: ["ExtraMonadoUtils"]),
     ],
     targets: [
@@ -19,6 +20,7 @@ let package = Package(
         .target(name: "ExtraMonadoUtils"),
         .target(name: "Monado", dependencies: [ "PrettyTree", "ExtraMonadoUtils" ]),
         .target(name: "Markup", dependencies: [ "Monado", "ExtraMonadoUtils" ]),
+        .target(name: "Markdown", dependencies: [ "Monado", "ExtraMonadoUtils" ]),
         .executableTarget(name: "dev", dependencies: [ "Monado", "Markup", "ExtraMonadoUtils" ]),
 //        .testTarget(name: "MonadoParserTests", dependencies: ["MonadoParser"]),
     ]
