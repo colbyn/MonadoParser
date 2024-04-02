@@ -130,32 +130,3 @@ extension Quadruple: ToPrettyTree where A: ToPrettyTree, B: ToPrettyTree, C: ToP
         ])
     }
 }
-
-//extension Tuple {
-//    public static func mergeParsers(
-//        a: Parser<A>,
-//        b: Parser<B>
-//    ) -> TupleParser<A, B> {
-//        a.and(b)
-//    }
-//}
-//extension Triple {
-//    public static func mergeParsers(
-//        a: Parser<A>,
-//        b: Parser<B>,
-//        c: Parser<C>
-//    ) -> TripleParser<A, B, C> {
-//        a.and2(b, c)
-//    }
-//}
-//extension Quadruple {
-//    public static func mergeParsers(
-//        a: Parser<A>,
-//        b: Parser<B>,
-//        c: Parser<C>,
-//        d: Parser<D>
-//    ) -> QuadrupleParser<A, B, C, D> {
-//        a.and3(b, c, d)
-//    }
-//}
-//
