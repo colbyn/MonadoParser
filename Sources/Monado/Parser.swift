@@ -65,16 +65,9 @@ public struct Parser<A> {
         self.binder = binder
     }
     /// `Output` encapsulates the result of a parsing attempt. It contains the parsed value (if any) and the resultant state of the parser, allowing for continuation or termination of parsing as dictated by the outcome.
-    internal struct Output {
-        let value: A?
-        let state: ParserState
-        fileprivate init(value: A?, state: ParserState) {
-            self.value = value
-            self.state = state
-        }
-    }
     /// `Result` is an enumeration that succinctly represents the outcome of a parsing operation: success (`ok`) with a value and updated state, or failure (`err`) with an error state.
-    internal enum Result {
+    /// Formerly called `Result` but renamed to the more unique `Output` type.
+    internal enum Output {
         case ok(value: A, state: ParserState)
         case err(state: ParserState)
     }
@@ -85,7 +78,8 @@ public struct Parser<A> {
 /// - debugScopes: An array of strings representing the hierarchical path of parser operations, useful for debugging.
 public struct ParserState {
     public let tape: Tape
-    public let debugScopes: [String]
+//    internal let guards: Dictionary<String, (Tape.Char) -> Bool>
+    internal let debugScopes: [String]
     internal init(tape: Tape, debugScopes: [String] = []) {
         self.tape = tape
         self.debugScopes = debugScopes
@@ -97,12 +91,12 @@ public struct ParserState {
     /// Checks if there is any remaining input to parse.
     public var isEmpty: Bool { tape.isEmpty }
     /// Attempts to consume the next character from the input, if available.
-    public var uncons: (Tape.Char, Self)? {
+    public var uncons: (Tape.FatChar, Self)? {
         tape.uncons.map {
             ($0.0, ParserState(tape: $0.1, debugScopes: debugScopes))
         }
     }
-    public func take(count: UInt) -> ([Tape.Char], Self) {
+    public func take(count: UInt) -> ([Tape.FatChar], Self) {
         let (xs, rest) = tape.take(count: count)
         return (xs, Self(tape: rest, debugScopes: debugScopes))
     }
@@ -112,15 +106,18 @@ public struct ParserState {
             ($0.0, Self(tape: $0.1, debugScopes: debugScopes))
         }
     }
-    public func uncons(pattern: Character) -> (Tape.Char, Self)? {
+    public func uncons(pattern: Character) -> (Tape.FatChar, Self)? {
         tape.uncons(pattern: pattern).map {
             ($0.0, ParserState(tape: $0.1, debugScopes: debugScopes))
         }
     }
-    public func uncons(predicate: @escaping (Character) -> Bool) -> (Tape.Char, Self)? {
-        tape.uncons(predicate: predicate).map {
+    public func unconsIf(predicate: @escaping (Tape.FatChar) -> Bool) -> (Tape.FatChar, Self)? {
+        tape.unconsIf(predicate: predicate).map {
             ($0.0, ParserState(tape: $0.1, debugScopes: debugScopes))
         }
+    }
+    public func unconsFor(predicate: @escaping (Character) -> Bool) -> (Tape.FatChar, Self)? {
+        unconsIf { predicate($0.value) }
     }
     /// Returns the entire remaining input as a string.
     public var asString: String { tape.asString }
@@ -128,13 +125,13 @@ public struct ParserState {
 
 extension ParserState {
     internal func ok<A>(value: A) -> Parser<A>.Output {
-        Parser<A>.Output(value: value, state: self)
+        Parser<A>.Output.ok(value: value, state: self)
     }
     internal func ok<A>(value: A, with tape: Tape) -> Parser<A>.Output {
-        Parser<A>.Output(value: value, state: ParserState.init(tape: tape, debugScopes: debugScopes))
+        Parser<A>.Output.ok(value: value, state: ParserState.init(tape: tape, debugScopes: debugScopes))
     }
     internal func err<A>() -> Parser<A>.Output {
-        Parser<A>.Output(value: nil, state: self)
+        Parser<A>.Output.err(state: self)
     }
     internal func update(_ transform: @escaping (Tape) -> Tape) -> Self {
         Self(tape: transform(tape), debugScopes: debugScopes)
@@ -149,17 +146,17 @@ extension ParserState {
         Self(tape: tape, debugScopes: debugScopes.with(append: scope))
     }
 }
-extension Parser.Output {
-    public var asResult: Parser.Result {
-        if let value = value {
-            return Parser.Result.ok(value: value, state: state)
-        }
-        return Parser.Result.err(state: state)
-    }
-    internal func set(debugScopes: [String]) -> Self {
-        Self(value: value, state: ParserState(tape: state.tape, debugScopes: debugScopes))
-    }
-}
+//extension Parser.Result {
+//    public var asResult: Parser.Result {
+//        if let value = value {
+//            return Parser.Result.ok(value: value, state: state)
+//        }
+//        return Parser.Result.err(state: state)
+//    }
+//    internal func set(debugScopes: [String]) -> Self {
+//        Self(value: value, state: ParserState(tape: state.tape, debugScopes: debugScopes))
+//    }
+//}
 
 /// A parser that does not produce a value but can be used to consume input according to specified rules or perform actions without returning a result.
 ///
@@ -167,12 +164,12 @@ extension Parser.Output {
 public typealias UnitParser = Parser<()>
 /// A parser designed to operate on and consume segments of `Tape`, a linked list of annotated characters, often used to represent the input stream.
 ///
-/// TapeParser is versatile for parsing tasks that require manipulation or inspection of the input stream, such as tokenizing or pattern matching.
+/// `TapeParser` is versatile for parsing tasks that require manipulation or inspection of the input stream, such as tokenizing or pattern matching.
 public typealias TapeParser = Parser<Tape>
 /// A specialized parser for consuming individual characters from the input stream.
 ///
-/// CharParser is used for fine-grained parsing tasks, such as identifying specific characters, validating character patterns, or parsing single tokens.
-public typealias CharParser = Parser<Tape.Char>
+/// `CharParser` is used for fine-grained parsing tasks, such as identifying specific characters, validating character patterns, or parsing single tokens.
+public typealias CharParser = Parser<Tape.FatChar>
 /// A parser that combines the results of two parsers into a `Tuple`, facilitating operations that require correlating the results of multiple parsing tasks.
 ///
 /// Ideal for parsing paired structures or two related data points simultaneously, like key-value pairs in configuration files or markup languages.
@@ -183,12 +180,13 @@ public typealias TupleParser<A, B> = Parser<Tuple<A, B>>
 public typealias TripleParser<A, B, C> = Parser<Triple<A, B, C>>
 /// A parser that aggregates the results of four parsers into a `Quadruple`, enabling the parsing of structures with four related elements.
 ///
-/// QuadrupleParser is particularly useful for data that naturally comes in fours, such as rectangles (with four sides) or date-time stamps broken into year, month, day, and hour.
+/// `QuadrupleParser` is particularly useful for data that naturally comes in fours, such as rectangles (with four sides) or date-time stamps broken into year, month, day, and hour.
 public typealias QuadrupleParser<A, B, C, D> = Parser<Quadruple<A, B, C, D>>
 /// A parser that can produce one of two possible result types, encapsulated in an `Either` type.
 ///
-/// EitherParser is ideal for parsing operations where the result can logically be one of two types, such as success/failure outcomes, or differentiating between two kinds of tokens in a language.
+/// `EitherParser` is ideal for parsing operations where the result can logically be one of two types, such as success/failure outcomes, or differentiating between two kinds of tokens in a language.
 public typealias EitherParser<A, B> = Parser<Either<A, B>>
+public typealias PredicateParser = Parser<Bool>
 
 // MARK: - DEBUG -
 extension ParserState: ToPrettyTree {

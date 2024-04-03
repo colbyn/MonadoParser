@@ -16,15 +16,18 @@ extension Parser {
     /// - Returns: A tuple containing the optional parsed value and the final state of the parser.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let parser = Parser<Int>.pure(value: 42)
     /// let result = parser.evaluate(source: "input string")
     /// print(result) // Prints "(Optional(42), ParserState(...))"
     /// ```
     public func evaluate(source: String) -> (A?, ParserState) {
         let state = ParserState.root(tape: Tape(from: source))
-        let output = self.binder(state)
-        return (output.value, output.state)
+        switch self.binder(state) {
+        case .ok(value: let a, state: let state): return (a, state)
+        case .err(state: let state): return (nil, state)
+            
+        }
     }
 }
 
@@ -39,17 +42,17 @@ extension UnitParser {
     /// - Returns: A parser that returns the result of the subparser, encapsulating success or failure, alongside the state after subparser execution, without affecting the original parser's state.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// // Parsing embedded JSON within a larger text stream.
     /// let jsonSegment = Tape(from: "{\"key\": \"value\"}")
     /// let jsonParser = Parser<JSON>.parseJSON // Hypothetical parser for JSON content.
     /// let forkedJSONParser = UnitParser.fork(pure: jsonSegment, subparser: jsonParser)
     /// // This setup isolates the JSON parsing from the main text stream, enabling embedded JSON parsing.
     /// ```
-    public static func fork<T>(pure input: Tape, subparser: @autoclosure @escaping () -> Parser<T>) -> Parser<(T?, ParserState)> {
+    public static func forkFor<T>(pure input: Tape, subparser: @autoclosure @escaping () -> Parser<T>) -> Parser<(T?, ParserState)> {
         Parser<(T?, ParserState)> { original in
             let forked = ParserState(tape: input, debugScopes: [])
-            switch subparser().binder(forked).asResult {
+            switch subparser().binder(forked) {
             case .ok(value: let t, state: let state):
                 return original.ok(value: (t, state))
             case .err(state: let state):
@@ -67,7 +70,7 @@ extension UnitParser {
     /// - Returns: A parser that returns the result of the subparser based on the extracted input, alongside the main parser's unmodified state.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// // Parsing a log file where certain lines contain JSON that requires special handling.
     /// let lineParser = TapeParser.restOfLine
     /// let jsonParser = Parser<JSON>.parseJSON // Hypothetical JSON parser.
@@ -77,15 +80,15 @@ extension UnitParser {
     /// )
     /// // This configuration allows each line to be checked for JSON content and parsed accordingly, isolating JSON parsing from general line parsing.
     /// ```
-    public static func fork<T>(
+    public static func forkFor<T>(
         extract: @escaping @autoclosure () -> TapeParser,
         execute subparser: @escaping @autoclosure () -> Parser<T>
     ) -> Parser<(T?, ParserState)> {
         Parser<(T?, ParserState)> {
-            switch extract().binder($0).asResult {
+            switch extract().binder($0) {
             case .ok(value: let input, state: let global):
                 let forked = ParserState(tape: input, debugScopes: [])
-                switch subparser().binder(forked).asResult {
+                switch subparser().binder(forked) {
                 case .ok(value: let t, state: let embeded):
                     return global.ok(value: (t, embeded))
                 case .err(state: let embeded):
@@ -105,7 +108,7 @@ extension Parser {
     /// - Returns: A parser that always returns the provided value.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let always42 = Parser<Int>.pure(value: 42)
     /// ```
     public static func pure(value: A) -> Self {
@@ -117,7 +120,7 @@ extension Parser {
     /// - Returns: A parser that always fails without consuming any input.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let failParser = Parser<String>.fail
     /// ```
     public static var fail: Self {
@@ -130,7 +133,7 @@ extension Parser {
     /// - Returns: A parser that succeeds if any of the provided parsers succeed.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let parser = Parser<String>.options([
     ///     Parser<String>.token("Hello"),
     ///     Parser<String>.token("World")
@@ -139,7 +142,7 @@ extension Parser {
     public static func options(_ parsers: @escaping @autoclosure () -> [Self]) -> Self {
         return Self {
             for p in parsers() {
-                switch p.binder($0).asResult {
+                switch p.binder($0) {
                 case .ok(value: let a, state: let o): return o.ok(value: a)
                 case .err: continue
                 }
@@ -147,11 +150,11 @@ extension Parser {
             return $0.err()
         }
     }
-    public func beforeAfterDebugLabels(before: String, after: String) -> Self {
+    public func withDebugLabels(before: String, after: String) -> Self {
         return UnitParser.unit
-            .with(debugScope: before)
+            .withDebugLabel(before)
             .keepRight(self)
-            .with(debugScope: after)
+            .withDebugLabel(after)
     }
     /// Sequences two parsers, running the second parser after the first and combining their results.
     ///
@@ -159,14 +162,14 @@ extension Parser {
     /// - Returns: A parser that combines the results of two parsers.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let combinedParser = Parser<String>.token("Hello").andThen { _ in Parser<String>.token("World") }
     /// ```
     public func andThen<B>(_ f: @escaping (A) -> Parser<B>) -> Parser<B> {
         Parser<B> {
-            switch self.binder($0).asResult {
+            switch self.binder($0) {
             case .ok(value: let a, state: let o):
-                switch f(a).binder(o).asResult {
+                switch f(a).binder(o) {
                 case .ok(value: let b, state: let o):
                     return o.ok(value: b)
                 case .err(state: let o):
@@ -183,7 +186,7 @@ extension Parser {
     /// - Returns: A parser that transforms its result with the given function.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let numberParser = Parser<String>.token("123").map { Int($0) }
     /// ```
     public func map<B>(_ f: @escaping (A) -> B) -> Parser<B> {
@@ -195,14 +198,14 @@ extension Parser {
     /// - Returns: A parser that may restore the input tape after parsing.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let parserWithBacktrack = Parser<String>.token("Hello").putBack(tape: Tape(from: " World"))
     /// ```
     public func putBack(tape: Tape?) -> Self {
         if let tape = tape {
             return Self {
                 let input = $0.set(tape: Tape.flatten(leading: tape, trailing: $0.tape))
-                switch binder(input).asResult {
+                switch binder(input) {
                 case .ok(value: let a, state: let o):
                     return o.ok(value: a)
                 case .err(state: let o):
@@ -212,7 +215,7 @@ extension Parser {
         }
         return self
     }
-    public func putBack(char: Tape.Char?) -> Self {
+    public func putBack(char: Tape.FatChar?) -> Self {
         let tape = char
             .map { Tape(from: [$0]) }
         return self.putBack(tape: tape)
@@ -223,18 +226,11 @@ extension Parser {
     /// - Returns: A parser that always succeeds with the given value.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let alwaysHello = Parser<String>.pure(value: "Hello")
     /// ```
     public func set<T>(pure value: T) -> Parser<T> {
-        Parser<T> {
-            switch self.binder($0).asResult {
-            case .ok(value: _, state: let o):
-                return o.ok(value: value)
-            case .err(state: let o):
-                return o.err()
-            }
-        }
+        map { _ in value }
     }
     /// Creates a parser that sequences this parser with another, discarding the result of this parser and only returning the result of the second.
     ///
@@ -244,21 +240,14 @@ extension Parser {
     /// - Returns: A parser that returns the result of the second parser if both parsers succeed; otherwise, it fails with the state of the first failure encountered.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let ignoreWhitespace = Parser<String>.whitespace
     /// let digitParser = CharParser.pop { $0.isNumber }
     /// let parseDigitAfterSpace = ignoreWhitespace.keepRight(digitParser)
     /// // Consumes and ignores whitespace, then parses and returns the next digit.
     /// ```
     public func keepRight<T>(_ f: @escaping @autoclosure () -> Parser<T>) -> Parser<T> {
-        Parser<T> {
-            switch self.binder($0).asResult {
-            case .ok(value: _, state: let o):
-                return f().binder(o)
-            case .err(state: let o):
-                return o.err()
-            }
-        }
+        andThen { _ in f() }
     }
     /// Creates a parser that ignores the result of another parser applied after the current parser.
     ///
@@ -266,22 +255,13 @@ extension Parser {
     /// - Returns: A parser that returns the result of the first parser while ignoring the result of the second.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let digitParser = CharParser.pop { $0.isNumber }
     /// let ignoreWhitespace = digitParser.ignoring(TapeParser.whitespace)
     /// // Parses a digit and then ignores any following whitespace.
     /// ```
     public func ignoring<B>(_ f: @escaping @autoclosure () -> Parser<B>) -> Parser<A> {
-        Parser<A> {
-            switch self.binder($0).asResult {
-            case .ok(value: let a, state: let o):
-                switch f().binder(o).asResult {
-                case .ok(value: _, state: let o): return o.ok(value: a)
-                case .err(state: let o): return o.err()
-                }
-            case .err(state: let o): return o.err()
-            }
-        }
+        andThen { a in f().map { _ in a} }
     }
     /// Attempts to parse using the current parser, then applies another parser on the remaining input and combines their results.
     ///
@@ -289,23 +269,14 @@ extension Parser {
     /// - Returns: A parser that sequences the application of two parsers and combines their results into a tuple.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let greetingParser = Parser<String>.token("Hello")
     /// let nameParser = Parser<String>.token("World")
     /// let combinedParser = greetingParser.and(nameParser)
     /// // If the input is "HelloWorld", the result will be a tuple ("Hello", "World").
     /// ```
     public func and<B>(_ f: @escaping @autoclosure () -> Parser<B>) -> TupleParser<A, B> {
-        TupleParser<A, B> {
-            switch self.binder($0).asResult {
-            case .ok(value: let a, state: let o):
-                switch f().binder(o).asResult {
-                case .ok(value: let b, state: let o): return o.ok(value: Tuple(a, b))
-                case .err(state: let o): return o.err()
-                }
-            case .err(state: let o): return o.err()
-            }
-        }
+        andThen { a in f().map { b in Tuple(a, b) } }
     }
     /// Combines the current parser with two additional parsers, sequencing their execution and aggregating their results into a triple.
     ///
@@ -315,7 +286,7 @@ extension Parser {
     /// - Returns: A parser that combines the results of all three parsers into a triple.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let parserA = Parser.token("First")
     /// let parserB = Parser.token("Second")
     /// let parserC = Parser.token("Third")
@@ -326,7 +297,7 @@ extension Parser {
         _ f: @escaping @autoclosure () -> Parser<B>,
         _ g: @escaping @autoclosure () -> Parser<C>
     ) -> TripleParser<A, B, C> {
-        self.and(f()).and(g()).map {
+        and(f()).and(g()).map {
             Triple($0.a.a, $0.a.b, $0.b)
         }
     }
@@ -335,7 +306,7 @@ extension Parser {
         _ g: @escaping @autoclosure () -> Parser<C>,
         _ h: @escaping @autoclosure () -> Parser<D>
     ) -> QuadrupleParser<A, B, C, D> {
-        self.and2(f(), g()).and(h()).map { Quadruple(a: $0.a.a, b: $0.a.b, c: $0.a.c, d: $0.b) }
+        and2(f(), g()).and(h()).map { Quadruple(a: $0.a.a, b: $0.a.b, c: $0.a.c, d: $0.b) }
     }
     /// Creates a parser that results in an `Either` type, encapsulating the result of the first successful parser.
     ///
@@ -343,7 +314,7 @@ extension Parser {
     /// - Returns: A parser that encapsulates the result of the first successful parser in an `Either` type.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let parserA = Parser.token("Hello")
     /// let parserB = Parser.token("World")
     /// let eitherParser = parserA.eitherOr(parserB)
@@ -351,11 +322,11 @@ extension Parser {
     /// ```
     public func eitherOr<B>(_ f: @escaping @autoclosure () -> Parser<B>) -> EitherParser<A, B> {
         return EitherParser<A, B> {
-            switch self.binder($0).asResult {
+            switch self.binder($0) {
             case .ok(value: let a, state: let o): return o.ok(value: .left(a))
             case .err(_): break
             }
-            switch f().binder($0).asResult {
+            switch f().binder($0) {
             case .ok(value: let b, state: let o): return o.ok(value: .right(b))
             case .err(_): break
             }
@@ -368,7 +339,7 @@ extension Parser {
     /// - Returns: The first successful parser result or fails if both parsers fail.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let parserA = Parser<String>.token("OptionA")
     /// let parserB = Parser<String>.token("OptionB")
     /// let choiceParser = parserA.or(parserB)
@@ -376,11 +347,11 @@ extension Parser {
     /// ```
     public func or(_ f: @escaping @autoclosure () -> Parser<A>) -> Parser<A> {
         Parser<A> {
-            switch self.binder($0).asResult {
+            switch self.binder($0) {
             case .ok(value: let a, state: let o): return o.ok(value: a)
             case .err(_): break
             }
-            switch f().binder($0).asResult {
+            switch f().binder($0) {
             case .ok(value: let a, state: let o): return o.ok(value: a)
             case .err(_): break
             }
@@ -392,13 +363,13 @@ extension Parser {
     /// - Returns: A parser that succeeds with an optional value.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let optionalDigit = CharParser.pop { $0.isNumber }.optional
     /// // Parses a single digit if present, otherwise succeeds with `nil`.
     /// ```
     public var optional: Parser<A?> {
         Parser<A?> {
-            switch self.binder($0).asResult {
+            switch self.binder($0) {
             case .ok(value: let a, state: let rest):
                 return rest.ok(value: a)
             case .err(state: _):
@@ -414,7 +385,7 @@ extension Parser {
             var counter = 0
             loop: while !current.tape.isEmpty {
                 counter += 1
-                switch self.binder(current).asResult {
+                switch self.binder(current) {
                 case .ok(value: let a, state: let rest):
                     last = current
                     current = rest
@@ -456,11 +427,11 @@ extension Parser {
                     let type = "Parser<[\(type(of: A.self))]>.sequenceUnless"
                     print("\(type) WARNING: TOO MANY ITERATIONS")
                 }
-                switch terminator().binder(current).asResult {
+                switch terminator().binder(current) {
                 case .ok(value: let b, state: let rest): return rest.ok(value: Tuple(results, b))
                 case .err: break
                 }
-                switch self.binder(current).asResult {
+                switch self.binder(current) {
                 case .ok(value: let a, state: let rest):
                     results.append(a)
                     last = current
@@ -492,7 +463,7 @@ extension Parser {
                     let type = "Parser<[\(type(of: A.self))]>.sequenceUntilEnd"
                     print("\(type) WARNING: TOO MANY ITERATIONS")
                 }
-                switch terminator().binder(current).asResult {
+                switch terminator().binder(current) {
                 case .ok(value: let b, state: let rest):
                     if !allowEmptyResults, results.isEmpty {
                         return $0.err()
@@ -501,7 +472,7 @@ extension Parser {
                 case .err:
                     ()
                 }
-                switch self.binder(current).asResult {
+                switch self.binder(current) {
                 case .ok(value: let a, state: let rest):
                     results.append(a)
                     last = current
@@ -523,7 +494,7 @@ extension Parser {
     /// - Returns: A parser that collects zero or more results from the repeated application of itself.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let digitsParser = CharParser.pop { $0.isNumber }.many
     /// // Collects a sequence of digits into an array.
     /// ```
@@ -535,7 +506,7 @@ extension Parser {
     /// - Returns: A parser that collects one or more results from the repeated application of itself.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let digitsParser = CharParser.pop { $0.isNumber }.some
     /// // Collects a sequence of one or more digits into an array.
     /// ```
@@ -551,7 +522,7 @@ extension Parser {
     /// - Returns: A parser that returns a tuple containing an array of successfully parsed values and an optional result of the terminator parser.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let digitParser = CharParser.pop { $0.isNumber }
     /// let commaTerminator = CharParser.char(",")
     /// let digitsUntilComma = digitParser.manyUnless(terminator: commaTerminator)
@@ -568,7 +539,7 @@ extension Parser {
     /// - Returns: A parser that returns a tuple containing an array of one or more successfully parsed values and an optional result of the terminator parser.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let wordParser = CharParser.pop { $0.isLetter }.many
     /// let periodTerminator = CharParser.char(".")
     /// let wordsUntilPeriod = wordParser.someUnless(terminator: periodTerminator)
@@ -584,7 +555,7 @@ extension Parser {
     /// - Returns: A parser that attempts to parse zero or more elements until the terminator is successfully parsed.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let comma = CharParser.char(",")
     /// let numberParser = CharParser.pop { $0.isNumber }.manyUntilEnd(terminator: comma)
     /// ```
@@ -597,7 +568,7 @@ extension Parser {
     /// - Returns: A parser that collects one or more results until the terminator is successfully parsed.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let commaSeparatedNumbers = CharParser.pop { $0.isNumber }.someUntilEnd(terminator: CharParser.char(","))
     /// // Parses a comma-separated list of numbers, requiring at least one number before a comma.
     /// ```
@@ -611,7 +582,7 @@ extension Parser {
     /// - Returns: A parser that collects results in an array and includes an optional termination result.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let optionalCommaTerminated = CharParser.pop { $0.isNumber }.manyUnless { CharParser.char(",") }
     /// // Parses a sequence of numbers, optionally terminated by a comma.
     /// ```
@@ -624,7 +595,7 @@ extension Parser {
     /// - Returns: A parser that collects one or more results and includes an optional termination result.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let requiredCommaTerminated = CharParser.pop { $0.isNumber }.someUnless { CharParser.char(",") }
     /// // Parses a sequence of numbers, requiring at least one number and allowing an optional terminating comma.
     /// ```
@@ -637,7 +608,7 @@ extension Parser {
     /// - Returns: A parser that may collect zero or more results and an optional terminator result.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let commentsParser = Parser<String>.token("//").manyUntilEnd(terminator: { CharParser.newline })
     /// // Parses zero or more comment lines, stopping at a newline.
     /// ```
@@ -650,7 +621,7 @@ extension Parser {
     /// - Returns: A parser that collects one or more results until the terminator is successfully parsed.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let blockContent = CharParser.any.except("}").someUntilEnd(terminator: CharParser.char("}"))
     /// // Parses the content of a block delimited by "{}", requiring at least one character before the closing brace.
     /// ```
@@ -663,7 +634,7 @@ extension Parser {
     /// - Returns: A parser that captures the leading delimiter, the main content, and the trailing delimiter as a triple.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let quotedString = Parser<String>.token("\"").between(bothEnds: Parser<String>.token("\""))
     /// // Parses a string enclosed in quotes, returning a triple with the opening quote, the string content, and the closing quote.
     /// ```
@@ -686,7 +657,7 @@ extension Parser {
     /// - Returns: A parser that returns a triple: the result of the leading delimiter, the main content, and the result of the trailing delimiter.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// // Assume we have predefined parsers for '<p>', '</p>', and any text content.
     /// let paragraphTag = Parser<String>.token("<p>")
     /// let closeParagraphTag = Parser<String>.token("</p>")
@@ -717,7 +688,7 @@ extension Parser {
     /// - Returns: A parser that ignores trailing whitespace.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let tokenParser = Parser<String>.token("Token").spacedRight
     /// ```
     public var spacedRight: Parser<A> {
@@ -728,7 +699,7 @@ extension Parser {
     /// - Returns: A parser that ignores leading whitespace.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let tokenParser = Parser<String>.token("Token").spacedLeft
     /// ```
     public var spacedLeft: Parser<A> {
@@ -739,7 +710,7 @@ extension Parser {
     /// - Returns: A parser that ignores surrounding whitespace.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let tokenParser = Parser<String>.token("Token").spaced
     /// ```
     public var spaced: Parser<A> {
@@ -762,20 +733,30 @@ extension Parser {
     // MARK: - DEBUG HELPERS
     /// Attaches a debugging label to the parser, which can be used for debugging purposes.
     ///
-    /// - Parameter debugScope: A string label to attach to the parser for debugging.
+    /// - Parameter label: A string label to attach to the parser for debugging.
     /// - Returns: A parser identical to the original, but with an attached debug label.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let debuggedParser = Parser<String>.token("Debugged").with(debugScope: "DebuggingToken")
     /// ```
-    public func with(debugScope: String) -> Self {
+    public func withDebugLabel(_ label: String) -> Self {
         Self {
-            switch self.binder($0).asResult {
+            switch self.binder($0) {
             case .ok(value: let a, state: let o):
-                return o.with(scope: debugScope).ok(value: a)
+                return o.with(scope: label).ok(value: a)
             case .err(state: let o):
-                return o.with(scope: debugScope).err()
+                return o.with(scope: label).err()
+            }
+        }
+    }
+    /// Disregards the current value.
+    public var forgotten: UnitParser {
+        UnitParser {
+            switch self.binder($0) {
+            case .ok(value: _, state: let rest):
+                return rest.ok(value: ())
+            case .err(state: let out): return out.err()
             }
         }
     }
@@ -788,7 +769,7 @@ extension UnitParser {
     /// - Returns: A parser that always succeeds and returns a unit value `()`.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let unit = UnitParser.unit
     /// // Can be used in places where you need to return from a parsing function but don't have a meaningful value to return.
     /// ```
@@ -801,7 +782,7 @@ extension UnitParser {
     /// - Returns: A parser that consumes and returns a single character if it matches, or fails.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let semicolonParser = UnitParser.char(";")
     /// ```
     public static func char(_ pattern: Character) -> CharParser {
@@ -813,7 +794,7 @@ extension UnitParser {
     /// - Returns: A parser that consumes a single character matching the predicate.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let digitParser = UnitParser.char { $0.isNumber }
     /// // Consumes a single digit from the input.
     /// ```
@@ -826,7 +807,7 @@ extension UnitParser {
     /// - Returns: A parser that consumes the specified string pattern from the input.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let helloParser = UnitParser.token("Hello")
     /// // Consumes the string "Hello" from the input.
     /// ```
@@ -841,7 +822,7 @@ extension UnitParser {
     /// - Returns: A parser that alternates between two parsers and collects their results.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let lettersParser = UnitParser.char { $0.isLetter }
     /// let numbersParser = UnitParser.char { $0.isNumber }
     /// let alternatingParser = UnitParser.alternatingHeterogeneousSequencesOf(f: lettersParser, g: numbersParser)
@@ -855,14 +836,14 @@ extension UnitParser {
             var current = $0
             var results: [Either<T, U>] = []
             loop: while !current.isEmpty {
-                switch f().binder(current).asResult {
+                switch f().binder(current) {
                 case .ok(value: let t, state: let rest):
                     results.append(.left(t))
                     current = rest
                     continue loop
                 case .err: break
                 }
-                switch g().binder(current).asResult {
+                switch g().binder(current) {
                 case .ok(value: let u, state: let rest):
                     results.append(.right(u))
                     current = rest
@@ -882,7 +863,7 @@ extension UnitParser {
     /// - Returns: A parser that alternates between two parsers of the same type and collects their results.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let vowelsParser = UnitParser.char { "aeiou".contains($0) }
     /// let consonantsParser = UnitParser.char { "bcdfghjklmnpqrstvwxyz".contains($0) }
     /// let alternatingParser = UnitParser.alternatingHomogeneousSequencesOf(f: vowelsParser, g: consonantsParser)
@@ -896,14 +877,14 @@ extension UnitParser {
             var current = $0
             var results: [T] = []
             loop: while !current.isEmpty {
-                switch f().binder(current).asResult {
+                switch f().binder(current) {
                 case .ok(value: let t, state: let rest):
                     results.append(t)
                     current = rest
                     continue loop
                 case .err: break
                 }
-                switch g().binder(current).asResult {
+                switch g().binder(current) {
                 case .ok(value: let t, state: let rest):
                     results.append(t)
                     current = rest
@@ -913,6 +894,15 @@ extension UnitParser {
                 break loop
             }
             return current.ok(value: results)
+        }
+    }
+    public func withParserState<T>(_ f: @escaping (ParserState) -> T) -> Parser<T> {
+        Parser<T> {
+            switch self.binder($0) {
+            case .ok(value: _, state: let rest):
+                return rest.ok(value: f(rest))
+            case .err(state: let res): return res.err()
+            }
         }
     }
 }
@@ -926,11 +916,11 @@ extension CharParser {
     /// - Returns: A parser that consumes the next available character.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let nextCharParser = CharParser.next
     /// // Consumes a single character from the input, useful for parsing schemes where characters are processed one by one.
     /// ```
-    public static var next: Parser<Tape.Char> {
+    public static var next: Parser<Tape.FatChar> {
         Self {
             if let (first, rest) = $0.uncons {
                 return rest.ok(value: first)
@@ -944,7 +934,7 @@ extension CharParser {
     /// - Returns: A parser that succeeds if the next character matches the pattern.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let aParser = CharParser.pop("a")
     /// ```
     public static func pop(_ pattern: Character) -> Self {
@@ -956,17 +946,26 @@ extension CharParser {
         }
     }
     /// Parses the next character if it satisfies the given predicate.
+    public static func unconsIf(_ predicate: @escaping (Tape.FatChar) -> Bool) -> Self {
+        Self {
+            guard let (head, rest) = $0.unconsIf(predicate: predicate) else {
+                return $0.err()
+            }
+            return rest.ok(value: head)
+        }
+    }
+    /// Parses the next character if it satisfies the given predicate.
     ///
     /// - Parameter predicate: A closure that takes a character and returns true if it should be parsed.
     /// - Returns: A parser that succeeds if the next character satisfies the predicate.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let digitParser = CharParser.pop { $0.isNumber }
     /// ```
     public static func pop(_ predicate: @escaping (Character) -> Bool) -> Self {
         Self {
-            guard let (head, rest) = $0.uncons(predicate: predicate) else {
+            guard let (head, rest) = $0.unconsFor(predicate: predicate) else {
                 return $0.err()
             }
             return rest.ok(value: head)
@@ -979,12 +978,18 @@ extension CharParser {
     /// - Returns: A parser that succeeds if the next character is a newline, consuming it.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let newlineParser = CharParser.newline
     /// // Consumes a newline character, useful for parsing tasks that involve structured text data.
     /// ```
     public static var newline: CharParser {
         CharParser.pop { $0.isNewline }
+    }
+    public static var space: CharParser {
+        CharParser.pop { $0.isWhitespace && !$0.isNewline }
+    }
+    public static var number: CharParser {
+        CharParser.pop { $0.isNumber }
     }
 }
 
@@ -998,7 +1003,7 @@ extension TapeParser {
     /// - Returns: A parser that consumes the specified string pattern if it matches the beginning of the input.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let keywordParser = TapeParser.pop("func")
     /// // Consumes the keyword "func" from the input, if present.
     /// ```
@@ -1015,7 +1020,7 @@ extension TapeParser {
     /// - Returns: A parser that consumes leading whitespace from the input and returns a `Tape` containing the consumed whitespace characters, up until a non-whitespace or newline character is encountered.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let whitespaceParser = TapeParser.whitespace
     /// // When applied, this parser will consume spaces or tabs and return them in a Tape, stopping before a non-whitespace or newline character.
     /// ```
@@ -1031,12 +1036,38 @@ extension TapeParser {
     /// - Returns: A parser that consumes all characters up to the next newline or the end of the input.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let lineParser = TapeParser.restOfLine
     /// // Consumes and returns the entire current line, excluding the terminating newline character.
     /// ```
     public static var restOfLine: Self {
         CharParser.pop { !$0.isNewline }.some.map(Tape.init(from:))
+    }
+    public static func manyUntilTerm<T>(terminator: @escaping @autoclosure () -> Parser<T>) -> Parser<Tuple<Tape, T>> {
+        Parser<Tuple<Tape, T>> {
+            var characters: [ Tape.FatChar ] = []
+            var current: ParserState = $0
+            var counter = 0
+            loop: while !current.tape.isEmpty {
+                counter += 1
+                if counter >= 1000 {
+                    print("TapeParser.manyUntilToken WARNING: TOO MANY ITERATIONS")
+                }
+                switch terminator().binder(current) {
+                case .ok(value: let b, state: let rest):
+                    return rest.ok(value: Tuple(Tape(from: characters), b))
+                case .err: ()
+                }
+                switch CharParser.next.binder(current) {
+                case .ok(value: let x, state: let rest):
+                    characters.append(x)
+                    current = rest
+                    continue loop
+                case .err: break loop
+                }
+            }
+            return $0.err()
+        }
     }
 }
 
@@ -1052,7 +1083,7 @@ extension Tuple {
     /// - Returns: A `TupleParser` that combines the results of both parsers into a tuple.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let parserA = Parser<String>.token("A")
     /// let parserB = Parser<Int>.pure(value: 1)
     /// let combinedParser = Tuple.joinParsers(f: parserA, g: parserB)
@@ -1077,7 +1108,7 @@ extension Triple {
     /// - Returns: A `TripleParser` that combines the results of the three parsers into a triple.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let parserA = Parser<String>.token("A")
     /// let parserB = Parser<String>.token("B")
     /// let parserC = Parser<Int>.pure(value: 2)
@@ -1105,7 +1136,7 @@ extension Quadruple {
     /// - Returns: A `QuadrupleParser` that combines the results of the four parsers into a quadruple.
     ///
     /// Example:
-    /// ```
+    /// ```swift
     /// let parserA = Parser<String>.token("A")
     /// let parserB = Parser<String>.token("B")
     /// let parserC = Parser<String>.token("C")

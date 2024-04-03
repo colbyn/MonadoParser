@@ -8,28 +8,35 @@
 import Foundation
 import PrettyTree
 
-/// A `Tape` is a linked list of annotated characters.
+/// A `Tape` is a linked list of annotated characters. (I would call it `Text` but it's taken by `SwiftUI`'s `Text` element.)
 ///
 /// `Tape` models a sequence of characters for parsing, allowing efficient, non-destructive consumption of input. It is designed to be easy to work with for parsing tasks, supporting operations like concatenation, splitting, and single-character consumption.
 ///
 /// The Tape type is a recursive enumeration that represents a sequence of annotated characters, akin to a linked list. Each character in the Tape carries not only the character value itself but also its position within the original input, facilitating rich, context-aware parsing and error reporting.
 public indirect enum Tape {
-    case empty, cons(Char, Tape)
+    case empty, cons(FatChar, Tape)
     /// Initializes a `Tape` from an array of `Char`, effectively converting a sequence of characters into a linked list.
-    public init(from stream: [Char]) {
+    public init(from stream: [FatChar]) {
         self = stream
             .reversed()
             .reduce(Tape.empty) { (rest, next) in Tape.cons(next, rest) }
     }
+    public init(flatten tapes: [Tape]) {
+        var xs: [FatChar] = []
+        for x in tapes.flatMap({ $0.flatten }) {
+            xs.append(x)
+        }
+        self = Tape(from: xs)
+    }
     /// Initializes a `Tape` with a single character, creating a singleton list.
-    public init(singleton head: Char) {
+    public init(singleton head: FatChar) {
         self = .cons(head, .empty)
     }
     /// Initializes a `Tape` from a `String`, annotating each character with its position index.
     public init(from string: String) {
         var position = PositionIndex.zero
         let chars = string.map {
-            let result = Char(value: $0, index: position)
+            let result = FatChar(value: $0, index: position)
             position = position.advance(for: $0)
             return result
         }
@@ -41,16 +48,18 @@ public indirect enum Tape {
         let ys = trailing.flatten
         return Tape(from: xs.with(append: ys))
     }
+    /// A `FatChar` is a Swift `Character` with metadata denoting its original source code position.
+    ///
     /// Represents an annotated character within the `Tape`, including its value and position in the original input.
-    public struct Char {
-        let value: Character
-        let index: PositionIndex
+    public struct FatChar {
+        public let value: Character
+        public let index: PositionIndex
     }
     /// Models the position of a character in the input, supporting detailed parsing error messages and context analysis.
     public struct PositionIndex {
-        let character: UInt
-        let column: UInt
-        let line: UInt
+        public let character: UInt
+        public let column: UInt
+        public let line: UInt
     }
 }
 
@@ -63,14 +72,14 @@ extension Tape {
         }
     }
     /// Attempts to consume the next character, returning it along with the rest of the `Tape`.
-    public var uncons: (Char, Tape)? {
+    public var uncons: (FatChar, Tape)? {
         switch self {
         case .empty: return nil
         case .cons(let char, let tape): return (char, tape)
         }
     }
     /// Attempts to consume a specified number of characters, returning them and the remaining `Tape`.
-    public func take(count: UInt) -> ([Char], Tape) {
+    public func take(count: UInt) -> ([FatChar], Tape) {
         if count == 0 {
             return ([], self)
         }
@@ -93,19 +102,23 @@ extension Tape {
         return nil
     }
     /// Attempts to consume a character matching a specific pattern.
-    public func uncons(pattern: Character) -> (Char, Tape)? {
+    public func uncons(pattern: Character) -> (FatChar, Tape)? {
         guard let (head, rest) = self.uncons else { return nil }
         guard head.value == pattern else { return nil }
         return (head, rest)
     }
     /// Attempts to consume a character satisfying a given predicate.
-    public func uncons(predicate: @escaping (Character) -> Bool) -> (Char, Tape)? {
+    public func unconsIf(predicate: @escaping (Tape.FatChar) -> Bool) -> (FatChar, Tape)? {
         guard let (head, rest) = self.uncons else { return nil }
-        guard predicate(head.value) else { return nil }
+        guard predicate(head) else { return nil }
         return (head, rest)
     }
+    /// Attempts to consume a character satisfying a given predicate.
+    public func unconsFor(predicate: @escaping (Character) -> Bool) -> (FatChar, Tape)? {
+        unconsIf(predicate: { predicate($0.value) })
+    }
     /// Returns the `Tape` as a flat array of characters.
-    public var flatten: [ Char ] {
+    public var flatten: [ FatChar ] {
         switch self {
         case .empty: return []
         case .cons(let char, let tape): return [char].with(append: tape.flatten)
@@ -116,10 +129,17 @@ extension Tape {
         String(flatten.map { $0.value })
     }
     /// Appends another `Tape` to this one.
-    public func with(append tail: Tape) -> Tape {
-        let xs = self.flatten
-        let ys = tail.flatten
-        return Tape(from: xs.with(append: ys))
+    public func with(append tail: Tape?) -> Tape {
+        if let tail = tail {
+            let xs = self.flatten
+            let ys = tail.flatten
+            return Tape(from: xs.with(append: ys))
+        }
+        return self
+    }
+    public func with(append char: Tape.FatChar) -> Tape {
+        let xs = self.flatten.with(append: [char])
+        return Tape(from: xs)
     }
     /// Checks if two `Tape` instances are semantically equal.
     public func semanticallyEqual(with other: Tape) -> Bool {
@@ -130,11 +150,23 @@ extension Tape {
         default: return false
         }
     }
+    public var positionIndex: PositionIndex? {
+        switch self {
+        case .cons(let char, _): return char.index
+        case .empty: return nil
+        }
+    }
 }
 
 extension Tape: CustomDebugStringConvertible {
     public var debugDescription: String {
         self.asString.debugDescription
+    }
+}
+
+extension Tape.FatChar {
+    public var singleton: Tape {
+        Tape(singleton: self)
     }
 }
 
@@ -155,7 +187,7 @@ extension Tape: ToPrettyTree {
         return PrettyTree.string(asString)
     }
 }
-extension Tape.Char: ToPrettyTree {
+extension Tape.FatChar: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
         return PrettyTree(label: "Tape.Char", children: [
             PrettyTree(key: "value", value: value),

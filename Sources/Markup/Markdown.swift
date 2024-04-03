@@ -11,7 +11,7 @@ import Monado
 public indirect enum Markdown {
     case plainText(Text)
     case newline(Token)
-    case raw(Tape)
+    case raw(Text)
     case paragraph(Paragraph)
     case emphasis(Emphasis)
     case heading(Heading)
@@ -19,7 +19,7 @@ public indirect enum Markdown {
     case link(Link)
     case inlineCode(InlineCode)
     case fencedCodeBlock(Markdown.FencedCodeBlock)
-    public init(char: Tape.Char) {
+    public init(char: Text.FatChar) {
         self = .plainText(Text(singleton: char))
     }
 }

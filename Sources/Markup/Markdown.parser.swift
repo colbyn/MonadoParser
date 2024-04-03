@@ -30,7 +30,7 @@ extension Markdown {
             ))
         let parser = UnitParser
             .alternatingHomogeneousSequencesOf( f: p1, g: p2 )
-        return parser.beforeAfterDebugLabels(before: "bgn:pp", after: "end:pp")
+        return parser.withDebugLabels(before: "bgn:pp", after: "end:pp")
     }
     public static func blockParser(env: Environment) -> Parser<Self> {
         let p2 = Markdown.newlineParser
@@ -45,18 +45,18 @@ extension Markdown {
         return Parser
             .char { !tokenSet.contains($0) && !$0.isNewline }
             .some
-            .map { Tape(from: $0) }
+            .map { Text(from: $0) }
     }
     public static func someSpecialCharParser(env: Environment) -> Parser<Self> {
         let tokenSet = env.avoidTheseInlineChars
         return CharParser
             .pop { tokenSet.contains($0) }
-            .map(Tape.init(singleton:))
+            .map(Text.init(singleton:))
             .map(Markdown.plainText)
     }
     public static var newlineParser: Parser<Self> {
         CharParser.newline
-            .map(Tape.init(singleton:))
+            .map(Text.init(singleton:))
             .map(Markdown.newline)
     }
 }
@@ -133,7 +133,7 @@ extension Markdown.Emphasis {
         let parser = Parser
             .options([ p1, p2, p3, p4, p5, p6 ])
             .map { Markdown.Emphasis( open: $0.a, content: $0.b.a, close: $0.b.b) }
-        return parser.beforeAfterDebugLabels(before: "bgn:emphasis", after: "end:emphasis")
+        return parser.withDebugLabels(before: "bgn:emphasis", after: "end:emphasis")
     }
 }
 extension Markdown.InlineCode {
@@ -176,7 +176,7 @@ extension Markdown.ListItem {
     }
     fileprivate static func restOfLineContentParser(env: Markdown.Environment) -> Parser<[Markdown]> {
         UnitParser
-            .fork( extract: TapeParser.restOfLine, execute: Markdown.inlineParser(env: env) )
+            .forkFor( extract: TapeParser.restOfLine, execute: Markdown.inlineParser(env: env) )
             .map { (content, unparsed) in
                 let content = content ?? []
                 if unparsed.isEmpty {
@@ -266,7 +266,7 @@ extension Markdown.Link {
         let p2 = Markdown.Link.HyperText.parser(env: env).map(Markdown.Link.hyperText)
         return Parser<Self>
             .options([ p1, p2 ])
-            .beforeAfterDebugLabels(before: "bgn:link", after: "end:link")
+            .withDebugLabels(before: "bgn:link", after: "end:link")
     }
 }
 extension Markdown.Link.HyperText {

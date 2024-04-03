@@ -32,10 +32,11 @@ public typealias OpenSquareBracket = Token
 public typealias CloseSquareBracket = Token
 
 public enum Markdown {
-    case inline(Inline), block(Block)
+    case inline(Inline), block(Block), raw(Tape)
 }
 
 public enum Inline {
+    case plainText(PlainText)
     case link(Link)
     case image(Image)
     case emphasis(Emphasis)
@@ -45,6 +46,10 @@ public enum Inline {
     case sup(Superscript)
     case inlineCode(InlineCode)
     case latex(Latex)
+    case lineBreak(Token)
+    public struct PlainText {
+        public let value: Tape
+    }
     public struct Link {
         public let text: InSquareBrackets<Text>
         public let openRoundBracket: OpenRoundBracket
@@ -95,9 +100,11 @@ public enum Inline {
         public let endDelimiter: Token
     }
     public struct InlineCode {
-        public let startBacktick: Token
-        public let content: [Inline]
-        public let endBacktick: Token
+        /// One or more backticks.
+        public let startDelimiter: Token
+        public let content: Tape
+        /// One or more backticks; matching the `startDelimiter`.
+        public let endDelimiter: Token
     }
     public struct InDoubleQuotes<Content> {
         public let openQuote: Token
@@ -126,20 +133,16 @@ public enum Block {
     case table(Table)
     case tableRow(TableRow)
     case tableCell(TableCell)
-    case latex(Latex)
     public struct Heading {
-        public let leadingWhitespace: Text
         /// Markdown allows for 1-6 `#` characters for headings
-        public let hashTokens: [ Token ]
+        public let hashTokens: Token
         public let content: [ Inline ]
     }
     public struct Paragraph {
-        public let leadingWhitespace: Text
         /// A paragraph can contain multiple text elements
         public let content: [Inline]
     }
     public struct Blockquote {
-        public let leadingWhitespace: Text
         /// The `>` character used to denote blockquotes
         public let startDelimiter: Token
         /// Blockquotes can contain multiple other Markdown elements
@@ -153,13 +156,11 @@ public enum Block {
         case ordered(OrderedListItem)
     }
     public struct UnorderedListItem {
-        public let leadingWhitespace: Text
         /// Either `*`, `-`, `+`, or a number followed by `.`
         public let bullet: Token
         public let content: [ Markdown ]
     }
     public struct OrderedListItem {
-        public let leadingWhitespace: Text
         public let number: Token
         public let dot: Token
         public let content: [ Markdown ]
@@ -168,7 +169,6 @@ public enum Block {
         public let items: [ TaskListItem ]
     }
     public struct TaskListItem {
-        public let leadingWhitespace: Text
         /// Represents the `[ ]` or `[x]` for task list items
         public let header: Inline.InSquareBrackets<Token?>
         /// Task list items can contain multiple other Markdown elements

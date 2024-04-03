@@ -52,6 +52,12 @@ public struct Tuple<A, B> {
         self.a = a
         self.b = b
     }
+    public func mapA<T>(_ f: @escaping (A) -> T) -> Tuple<T, B> {
+        Tuple<T, B>(f(a), b)
+    }
+    public func mapB<T>(_ f: @escaping (B) -> T) -> Tuple<A, T> {
+        Tuple<A, T>(a, f(b))
+    }
 }
 /// A generic structure for holding three related values of possibly different types.
 ///
