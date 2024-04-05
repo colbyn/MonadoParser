@@ -71,6 +71,15 @@ extension Tape {
         case .cons: return false
         }
     }
+    public var head: FatChar? {
+        switch self {
+        case .cons(let char, _): return char
+        case .empty: return nil
+        }
+    }
+    public var last: FatChar? {
+        flatten.last
+    }
     /// Attempts to consume the next character, returning it along with the rest of the `Tape`.
     public var uncons: (FatChar, Tape)? {
         switch self {

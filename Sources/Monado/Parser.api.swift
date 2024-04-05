@@ -509,10 +509,10 @@ extension Parser {
         terminator: @autoclosure @escaping () -> Parser<C>,
         useTerminator: Bool,
         allowEmpty: Bool
-    ) -> Parser<SeperatedByEndBy<A, B, C>> {
-        Parser<SeperatedByEndBy<A, B, C>> {
+    ) -> Parser<Etc.SeperatedByEndBy<A, B, C>> {
+        Parser<Etc.SeperatedByEndBy<A, B, C>> {
             let _ = $0
-            var results: [ SeperatedBy<A, B> ] = []
+            var results: [ Etc.SeperatedBy<A, B> ] = []
             var current: ParserState = $0
             loop: while !current.tape.isEmpty {
                 // - -
@@ -522,41 +522,24 @@ extension Parser {
                         if !allowEmpty, results.isEmpty {
                             return $0.err()
                         }
-                        return rest0.ok(value: SeperatedByEndBy(rows: results, terminal: c))
+                        return rest0.ok(value: Etc.SeperatedByEndBy(rows: results, terminal: c))
                     case .err: ()
                     }
                 }
                 // - -
                 switch self.some.and(separator()).binder(current) {
                 case .ok(value: let entry, state: let rest):
-                    results.append(SeperatedBy(content: entry.a, separator: entry.b))
+                    results.append(Etc.SeperatedBy(content: entry.a, separator: entry.b))
                     current = rest
                     continue loop
                 case .err:
                     break loop
                 }
-//                switch self.binder(current) {
-//                case .ok(value: let a, state: let rest1):
-//                    // - -
-//                    current = rest1
-//                    // - -
-//                    switch separator().binder(rest1) {
-//                    case .ok(value: let b, state: let rest2):
-//                        current = rest2
-////                        results.append(Tuple(a, b))
-//                        continue loop
-//                    case .err:
-//                        break loop
-//                    }
-//                case .err:
-//                    // - -
-//                    break loop
-//                }
             }
             if !allowEmpty, results.isEmpty {
                 return $0.err()
             }
-            return current.ok(value: SeperatedByEndBy(rows: results, terminal: nil))
+            return current.ok(value: Etc.SeperatedByEndBy(rows: results, terminal: nil))
         }
     }
     // MARK: - BASIC MANY COMBINATORS -
@@ -702,26 +685,26 @@ extension Parser {
     // MARK: - NEW -
     public func manySeperatedBy<B>(
         separator: @autoclosure @escaping () -> Parser<B>
-    ) -> Parser<[SeperatedBy<A, B>]> {
+    ) -> Parser<[Etc.SeperatedBy<A, B>]> {
         sequenceSeperatedByEndBy(separator: separator(), terminator: UnitParser.fail, useTerminator: false, allowEmpty: true)
             .map { $0.rows }
     }
     public func someSeperatedBy<B>(
         separator: @autoclosure @escaping () -> Parser<B>
-    ) -> Parser<[SeperatedBy<A, B>]> {
+    ) -> Parser<[Etc.SeperatedBy<A, B>]> {
         sequenceSeperatedByEndBy(separator: separator(), terminator: UnitParser.fail, useTerminator: false, allowEmpty: false)
             .map { $0.rows }
     }
     public func manySeperatedBy<B, C>(
         separator: @autoclosure @escaping () -> Parser<B>,
         terminator: @autoclosure @escaping () -> Parser<C>
-    ) -> Parser<SeperatedByEndBy<A, B, C>> {
+    ) -> Parser<Etc.SeperatedByEndBy<A, B, C>> {
         sequenceSeperatedByEndBy(separator: separator(), terminator: terminator(), useTerminator: true, allowEmpty: true)
     }
     public func someSeperatedBy<B, C>(
         separator: @autoclosure @escaping () -> Parser<B>,
         terminator: @autoclosure @escaping () -> Parser<C>
-    ) -> Parser<SeperatedByEndBy<A, B, C>> {
+    ) -> Parser<Etc.SeperatedByEndBy<A, B, C>> {
         sequenceSeperatedByEndBy(separator: separator(), terminator: terminator(), useTerminator: true, allowEmpty: false)
     }
     /// Encloses the parser within leading and trailing terminators, returning the parsed value flanked by the terminators' results.
@@ -1015,6 +998,66 @@ extension UnitParser {
             }
         }
     }
+    public static func lines(
+        lineStart: @escaping @autoclosure () -> TapeParser,
+        terminator: @escaping @autoclosure () -> ControlFlowParser = ControlFlowParser.noop,
+        trim: Bool = true
+    ) -> Parser<Etc.Lines<Tape, Tape>> {
+        Parser<Etc.Lines<Tape, Tape>> {
+            var current = $0
+            var results: [Tape.FatChar] = []
+            var lineGuard: Tape.PositionIndex? = nil
+            var terminate = false
+            var lineStarts: [Tape] = []
+            // - -
+            let remainingLine = TapeParser.restOfLine.optional.and(CharParser.newline.optional).map {
+                return Tape.init(
+                    from: ($0.a?.flatten ?? []).with(append: $0.b.map{[$0]} ?? [])
+                )
+            }
+            // - -
+            loop: while !current.isEmpty && !terminate {
+                if case .ok(value: .break, state: let rest) = terminator().binder(current) {
+                    return rest.ok(
+                        value: Etc.Lines(lineStarts: lineStarts, content: Tape(from: results))
+                    )
+                }
+                // - -
+                switch lineStart().and(remainingLine).binder(current) {
+                case .ok(value: let output, state: let rest):
+                    let leading = output.a.flatten
+                    let trailing = output.b.flatten
+                    let line = leading.with(append: trailing)
+                    // - -
+                    if leading.isEmpty {
+                        break loop
+                    }
+                    // - -
+                    if let lineGuard = lineGuard, let last = leading.last {
+                        let isValid = last.index.column == lineGuard.column
+                        terminate = !isValid
+                    } else {
+                        lineGuard = leading.last?.index
+                    }
+                    // - -
+                    if !terminate {
+                        results.append(contentsOf: trim ? trailing : line)
+                        lineStarts.append(output.a)
+                        current = rest
+                    }
+                case .err: break loop
+                }
+            }
+            // - -
+            if results.isEmpty {
+                return $0.err()
+            }
+            // - -
+            return current.ok(
+                value: Etc.Lines(lineStarts: lineStarts, content: Tape(from: results))
+            )
+        }
+    }
 }
 
 // MARK: - TAPE CHARACTER PARSER -
@@ -1212,6 +1255,15 @@ extension TapeParser {
             }
             return $0.err()
         }
+    }
+    public func append(char: @escaping @autoclosure () -> CharParser) -> TapeParser {
+        self.and(char()).map { $0.a.with(append: $0.b) }
+    }
+    public func append(tape: @escaping @autoclosure () -> TapeParser) -> TapeParser {
+        self.and(tape()).map { $0.a.with(append: $0.b) }
+    }
+    public func append(chars: @escaping @autoclosure () -> Parser<[Tape.FatChar]>) -> TapeParser {
+        self.and(chars()).map { $0.a.with(append: Tape(from: $0.b)) }
     }
 }
 

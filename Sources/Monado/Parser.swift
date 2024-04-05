@@ -170,17 +170,6 @@ extension ParserState {
         Self(tape: tape, debugScopes: debugScopes.with(append: scope))
     }
 }
-//extension Parser.Result {
-//    public var asResult: Parser.Result {
-//        if let value = value {
-//            return Parser.Result.ok(value: value, state: state)
-//        }
-//        return Parser.Result.err(state: state)
-//    }
-//    internal func set(debugScopes: [String]) -> Self {
-//        Self(value: value, state: ParserState(tape: state.tape, debugScopes: debugScopes))
-//    }
-//}
 
 /// A parser that does not produce a value but can be used to consume input according to specified rules or perform actions without returning a result.
 ///
@@ -211,6 +200,7 @@ public typealias QuadrupleParser<A, B, C, D> = Parser<Quadruple<A, B, C, D>>
 /// `EitherParser` is ideal for parsing operations where the result can logically be one of two types, such as success/failure outcomes, or differentiating between two kinds of tokens in a language.
 public typealias EitherParser<A, B> = Parser<Either<A, B>>
 public typealias PredicateParser = Parser<Bool>
+public typealias ControlFlowParser = Parser<ControlFlow>
 
 // MARK: - DEBUG -
 extension ParserState: ToPrettyTree {

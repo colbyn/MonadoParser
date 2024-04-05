@@ -9,7 +9,7 @@ import Foundation
 import Monado
 import Markdown
 
-let source1 = """
+fileprivate let source1 = """
 - Boil water in a kettle.
   - Use filtered water for a better taste.
 
@@ -23,7 +23,7 @@ let source1 = """
 - Enjoy your tea.
   - Add honey or lemon if desired.
 """
-let source2 = """
+fileprivate let source2 = """
 1. Boil water in a kettle.
     - Use filtered water for a better taste.
 2. Place a tea bag in your cup.
@@ -36,7 +36,7 @@ let source2 = """
 5. Enjoy your tea.
     - Add honey or lemon if desired.
 """
-let source3 = """
+fileprivate let source3 = """
 - Boil water in a kettle.
   - Use filtered water for a better taste.
  - Place a tea bag in your cup.
@@ -60,11 +60,10 @@ let source3 = """
 5. Enjoy your tea.
     - Add honey or lemon if desired.
 """
-
-let sample = """
-- Hello World
-  Hello World
-  Hello World
+fileprivate let sample = """
+> A
+> B
+> C
 """
 
 //let parser = Parser
@@ -75,7 +74,7 @@ let sample = """
 //    ])
 //    .many
 //let parser = CharParser.next
-let parser = TapeParser.pop("- ").and(
+let parser1 = TapeParser.pop("- ").and(
     UnitParser.bounded(
         extract: TapeParser.wholeIndentedBlock(deindent: true),
         execute: Parser
@@ -86,6 +85,7 @@ let parser = TapeParser.pop("- ").and(
             .many
     )
 )
+let parser = UnitParser.lines(lineStart: TapeParser.pop("> "))
 
 let (result, unparsed) = parser.evaluate(source: sample)
 if let result = result {

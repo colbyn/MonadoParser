@@ -99,13 +99,26 @@ public struct Quadruple<A, B, C, D> {
         self.d = d
     }
 }
-public struct SeperatedBy<A, B> {
-    public let content: [A]
-    public let separator: B?
+
+public enum ControlFlow {
+    case `continue`
+    case `break`
+    public var isContinue: Bool {
+        switch self {
+        case .continue: return true
+        default: return false
+        }
+    }
+    public var isBreak: Bool {
+        switch self {
+        case .break: return true
+        default: return false
+        }
+    }
 }
-public struct SeperatedByEndBy<A, B, C> {
-    public let rows: [ SeperatedBy<A, B> ]
-    public let terminal: C?
+
+extension ControlFlowParser {
+    public static let noop: Self = ControlFlowParser.pure(value: .continue)
 }
 
 // MARK: - DEBUG -
