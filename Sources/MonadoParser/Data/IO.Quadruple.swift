@@ -27,6 +27,25 @@ extension IO {
     public typealias QuadrupleParser<A, B, C, D> = Parser<Quadruple<A, B, C, D>>
 }
 
+extension IO.Quadruple {
+    public static func join(
+        a: @autoclosure @escaping () -> IO.Parser<A>,
+        b: @autoclosure @escaping () -> IO.Parser<B>,
+        c: @autoclosure @escaping () -> IO.Parser<C>,
+        d: @autoclosure @escaping () -> IO.Parser<D>
+    ) -> IO.QuadrupleParser<A, B, C, D> {
+        a().andThen { a in
+            b().andThen { b in
+                c().andThen { c in
+                    d().andThen { d in
+                        IO.Parser.pure(value: IO.Quadruple(a: a, b: b, c: c, d: d))
+                    }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - DEBUG -
 extension IO.Quadruple: ToPrettyTree where A: ToPrettyTree, B: ToPrettyTree, C: ToPrettyTree, D: ToPrettyTree {
     public var asPrettyTree: PrettyTree {

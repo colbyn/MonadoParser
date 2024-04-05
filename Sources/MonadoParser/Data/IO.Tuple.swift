@@ -30,6 +30,16 @@ extension IO.Tuple {
     public func mapB<T>(_ f: @escaping (B) -> T) -> IO.Tuple<A, T> {
         IO.Tuple<A, T>(a, f(b))
     }
+    public static func join(
+        a: @autoclosure @escaping () -> IO.Parser<A>,
+        b: @autoclosure @escaping () -> IO.Parser<B>
+    ) -> IO.TupleParser<A, B> {
+        a().andThen { a in
+            b().andThen { b in
+                IO.Parser.pure(value: Self(a, b))
+            }
+        }
+    }
 }
 
 // MARK: - DEBUG -

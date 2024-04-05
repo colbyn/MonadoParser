@@ -14,11 +14,11 @@ extension IO {
 }
 
 extension IO.State {
-    internal func ok<A>(value: A) -> IO.Parser<A>.Output {
-        IO.Parser<A>.Output.ok(value: value, state: self)
+    internal func `continue`<A>(value: A) -> IO.Parser<A>.Output {
+        IO.Parser<A>.Output.continue(value: value, state: self)
     }
-    internal func err<A>() -> IO.Parser<A>.Output {
-        IO.Parser<A>.Output.err(state: self)
+    internal func `break`<A>() -> IO.Parser<A>.Output {
+        IO.Parser<A>.Output.break(state: self)
     }
     internal func set(text: IO.Text) -> Self {
         Self(text: text)

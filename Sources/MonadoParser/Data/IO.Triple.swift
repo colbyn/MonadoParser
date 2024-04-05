@@ -38,6 +38,19 @@ extension IO.Triple {
     public func mapC<T>(_ f: @escaping (C) -> T) -> IO.Triple<A, B, T> {
         IO.Triple<A, B, T>(a, b, f(c))
     }
+    public static func join(
+        a: @autoclosure @escaping () -> IO.Parser<A>,
+        b: @autoclosure @escaping () -> IO.Parser<B>,
+        c: @autoclosure @escaping () -> IO.Parser<C>
+    ) -> IO.TripleParser<A, B, C> {
+        a().andThen { a in
+            b().andThen { b in
+                c().andThen { c in
+                    IO.Parser.pure(value: IO.Triple(a, b, c))
+                }
+            }
+        }
+    }
 }
 
 // MARK: - DEBUG -

@@ -47,6 +47,29 @@ extension IO.Either {
         case .left(_): return nil
         }
     }
+    public static func `try`(
+        left: @escaping @autoclosure () -> IO.Parser<Left>,
+        right: @escaping @autoclosure () -> IO.Parser<Right>
+    ) -> IO.EitherParser<Left, Right> {
+        IO.EitherParser<Left, Right> {
+            if case .continue(value: let left, state: let state) = left().binder($0) {
+                return state.continue(value: IO.Either.left(left))
+            }
+            if case .continue(value: let right, state: let state) = right().binder($0) {
+                return state.continue(value: IO.Either.right(right))
+            }
+            return $0.break()
+        }
+    }
+}
+
+extension IO.Either where Left == Right {
+    public var into: Left {
+        switch self {
+        case .left(let left): return left
+        case .right(let right): return right
+        }
+    }
 }
 
 // MARK: - DEBUG -
