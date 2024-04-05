@@ -13,7 +13,6 @@ extension Markdown: ToPrettyTree {
         switch self {
         case .block(let x): return x.asPrettyTree
         case .inline(let x): return x.asPrettyTree
-        case .raw(let x): return .init(key: ".raw", value: x)
         }
     }
 }
@@ -33,6 +32,7 @@ extension Inline: ToPrettyTree {
         case .inlineCode(let x): return x.asPrettyTree
         case .latex(let x): return x.asPrettyTree
         case .lineBreak(let x): return x.asPrettyTree
+        case .raw(let x): return .init(key: ".raw", value: x)
         }
     }
 }
@@ -135,8 +135,7 @@ extension Block: ToPrettyTree {
         case .fencedCodeBlock(let x): return x.asPrettyTree
         case .horizontalRule(let x): return x.asPrettyTree
         case .table(let x): return x.asPrettyTree
-        case .tableRow(let x): return x.asPrettyTree
-        case .tableCell(let x): return x.asPrettyTree
+        case .newline(let x): return .init(key: "newline", value: x)
 //        case .latex(let x): return x.asPrettyTree
         }
     }
@@ -231,24 +230,50 @@ extension Block.HorizontalRule: ToPrettyTree {
 extension Block.Table: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
         return PrettyTree(label: "Block.Table", children: [
-            .init(key: "rows", value: rows)
+            .init(key: "header", value: header),
+            .init(key: "data", value: data),
         ])
     }
 }
-extension Block.TableRow: ToPrettyTree {
+extension Block.Table.Header: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
-        return PrettyTree(label: "Block.TableRow", children: [
+        .init(label: "Block.Table.Header", children: [
+            .init(key: "header", value: header),
+            .init(key: "separator", value: separator),
+        ])
+    }
+}
+extension Block.Table.SeperatorRow: ToPrettyTree {
+    public var asPrettyTree: PrettyTree {
+        .init(label: "Block.Table.SeperatorRow", children: [
             .init(key: "startDelimiter", value: startDelimiter),
-            .init(key: "cells", value: cells.map { $0.asPrettyTree }),
+            .init(key: "columns", value: columns),
+        ])
+    }
+}
+extension Block.Table.SeperatorRow.Cell: ToPrettyTree {
+    public var asPrettyTree: PrettyTree {
+        .init(label: "Block.Table.SeperatorRow.Cell", children: [
+            .init(key: "startColon", value: startColon),
+            .init(key: "dashes", value: dashes),
+            .init(key: "endColon", value: endColon),
             .init(key: "endDelimiter", value: endDelimiter),
         ])
     }
 }
-extension Block.TableCell {
+extension Block.Table.Row: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
-        .init(label: "Block.TableCell", children: [
+        return PrettyTree(label: "Block.Table.Row", children: [
+            .init(key: "startDelimiter", value: startDelimiter),
+            .init(key: "cells", value: cells),
+        ])
+    }
+}
+extension Block.Table.Row.Cell: ToPrettyTree {
+    public var asPrettyTree: PrettyTree {
+        .init(label: "Block.Table.Row.Cell", children: [
             .init(key: "content", value: content),
-            .init(key: "separator", value: separator),
+            .init(key: "pipeDelimiter", value: pipeDelimiter),
         ])
     }
 }

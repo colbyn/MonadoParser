@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import ExtraMonadoUtils
 
 public enum PrettyTree {
     case empty
@@ -34,7 +35,7 @@ public enum PrettyTree {
         case .value(let x):
             self = Self.value("\(key): \(x)")
         case .string(let x):
-            self = Self.value("\(key): \(x.truncate(limit: 50).debugDescription)")
+            self = Self.value("\(key): \(x.truncated(limit: 100, position: .middle).debugDescription)")
         case let x:
             self = Self(label: key, children: [x])
         }
@@ -175,7 +176,7 @@ extension PrettyTree {
         switch self {
         case .empty: return ""
         case .value(let x): return formater.leaf(value: x)
-        case .string(let x): return formater.leaf(value: x.truncated(limit: 50, position: .middle).debugDescription)
+        case .string(let x): return formater.leaf(value: x.truncated(limit: 100, position: .middle).debugDescription)
         case .branch(let branch): return formater.branch(label: branch.label, children: branch.children)
         case .fragment(_):
             fatalError("TODO")
@@ -185,3 +186,8 @@ extension PrettyTree {
         self.format(formater: .root)
     }
 }
+//extension Void: ToPrettyTree {
+//    public var asPrettyTree: PrettyTree {
+//        fatalError("TODO")
+//    }
+//}

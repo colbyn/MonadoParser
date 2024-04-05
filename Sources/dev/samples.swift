@@ -839,3 +839,54 @@ This paragraph includes `inline code`, **bold**, *italic*, ~~strikethrough~~, an
 5. Enjoy your tea.
     - Add honey or lemon if desired.
 """
+// MARK: - EXAMPLE 6 -
+let markdownSourceCodeExample6 = """
+| Header 1 | Header 2 | Header 3 |
+|----------|----------|----------|
+| Row 1.A    | Data     | Example  |
+| Row 2.B    | Data     | Example  |
+
+Name    | Age | City
+------- | --- | ----------
+John Doe| 29  | San Francisco
+Jane Doe| 32  | New York
+
+Product  | Price | Quantity
+:--------| -----:|:--------:
+Apple    |    $1 | 100
+Banana   |   $.5 | 500
+
+Feature   | Supported | Details
+----------|:---------:| -------
+Markdown  | YES       | Basic syntax only
+Tables    | PARTIAL   | Without outer pipes
+Footnotes | NO        |
+
+Author        | Work          | Year
+--------------|---------------| ----
+Shakespeare   | Hamlet        | 1600
+Fitzgerald    | Great Gatsby  | 1925
+Orwell        | 1984          | 1949
+
+
+Main Category | Sub-category | Details
+--------------|--------------| -------
+Fruit         | Apple        | Green
+              | Banana       | Yellow
+Vegetables    | Carrot       | Orange
+              | Lettuce      | Green
+
+Title  | Description
+------ | -----------
+Item 1 | This is a longer description that spans more text.
+Item 2
+Item 3 | Description | Extra column
+
+Item      | Description    | Price
+--------- | -------------- | ------
+Pen       | Blue ink       | $1.25
+Notebook  | 100 pages      | $2.50
+
+First Name | Last Name | Email Address
+-----------|-----------|--------------
+"""

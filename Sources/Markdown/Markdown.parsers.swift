@@ -153,7 +153,7 @@ extension Inline.InlineCode {
         let start = CharParser.pop("`").some.map(Tape.init(from:))
         let parser: Parser<Self> = start.andThen { start in
             let end = TapeParser.pop(start.asString)
-            let content = TapeParser.manyUntilTerm(terminator: end)
+            let content = TapeParser.consumeManyUntilTerm(terminator: end)
             let parser = content.map {
                 Self(startDelimiter: start, content: $0.a, endDelimiter: $0.b)
             }
@@ -163,6 +163,11 @@ extension Inline.InlineCode {
     }
 }
 // MARK: - BLOCK PARSERS -
+extension Block {
+    public static func parser(env: Environment) -> Parser<Self> {
+        fatalError("TODO")
+    }
+}
 extension Block.Heading {
     public static func parser(env: Environment) -> Parser<Self> {
         let hashTokens = TapeParser.options([
@@ -188,31 +193,17 @@ extension Block.Paragraph {
         return parser
     }
     public static var wholeChunk: TapeParser {
-        // This parser attempts to consume everything up to a blank line (two newline characters in sequence)
-        // or the end of input. It should capture the paragraph content directly as a Tape.
-        
-        // Define a parser that consumes any character that is not a newline,
-        // effectively consuming non-empty lines.
-        let nonNewlineChar = CharParser.pop { $0 != "\n" }
-        
-        // A parser for newline characters to help identify blank lines or paragraph breaks.
-        let newline = CharParser.pop("\n")
-        
-        // Parser for non-empty lines, capturing content until a newline character.
-        let nonEmptyLine = nonNewlineChar.many.map(Tape.init(from:)).and(newline).map { $0.a }
-        
-        // Parser that captures a sequence of non-empty lines until a blank line (two consecutive newlines)
-        // or the end of input is reached.
-        let paragraphContent = nonEmptyLine
-            .someUnless( terminator: TapeParser.pop("\n\n") )
-            .andThen {
-                let output = Tape(flatten: $0.a)
-                return UnitParser.unit
-                    .set(pure: output)
-                    .putBack(tape: $0.b)
-            }
-        
-        return paragraphContent
+        let body = CharParser.next
+            .notFollowedBy(TapeParser.pop("\n\n"))
+            .some
+            .map(Tape.init(from:))
+        let rest = CharParser
+            .pop { !$0.isNewline }
+            .many
+            .map(Tape.init(from:))
+        return Tuple
+            .joinParsers(f: body, g: rest)
+            .map { Tape(flatten: [$0.a, $0.b]) }
     }
 }
 extension Block.Blockquote {
@@ -254,35 +245,29 @@ extension Block.List {
 }
 extension Block.ListItem {
     public static func parser(env: Environment) -> Parser<Self> {
-        let env = env.withScope(block: .listItem)
-        fatalError("TODO: \(env.asPrettyTree.format())")
+        Parser.options([
+            Block.UnorderedListItem.parser(env: env).map(Self.unordered),
+            Block.OrderedListItem.parser(env: env).map(Self.ordered),
+        ])
     }
 }
 extension Block.UnorderedListItem {
     public static func parser(env: Environment) -> Parser<Self> {
-//        let env = env.withScope(block: .unorderedListItem)
-//        let bullet = Self.bullet
+        let env = env.withScope(block: .unorderedListItem)
+//        let leader = Self.bullet
+//        let main = UnitParser.bounded(
+//            extract: TapeParser.wholeIndentedBlock,
+//            execute: <#T##Parser<T>#>
+//        )
         fatalError("TODO: \(env.asPrettyTree.format())")
     }
-    public static var wholeChunk: TapeParser {
-        Self.bullet.andThen { start in
-            CharParser
-                .unconsIf {
-                    let check1 = $0.value.isWhitespace
-                    let check2 = $0.index.column > start.b.index.column
-                    return (check1 || check2) // any whitespace or indented chars
-                }
-                .some
-                .map(Tape.init(from:))
-                .map { start.a.singleton.with(append: start.b).with(append: $0) }
-        }
-    }
     public static var bullet: TupleParser<Tape.FatChar, Tape.FatChar> {
-        TupleParser<Tape.FatChar, Tape.FatChar>.options([
-            CharParser.pop("*").and(CharParser.space),
-            CharParser.pop("-").and(CharParser.space),
-            CharParser.pop("+").and(CharParser.space),
+        let options = Parser.options([
+            CharParser.pop("*"),
+            CharParser.pop("-"),
+            CharParser.pop("+"),
         ])
+        return options.and(CharParser.space)
     }
 }
 extension Block.OrderedListItem {
@@ -290,19 +275,16 @@ extension Block.OrderedListItem {
         let env = env.withScope(block: .orderedListItem)
         fatalError("TODO: \(env.asPrettyTree.format())")
     }
-    public static var wholeChunk: TapeParser {
-        Self.leader.andThen { start in
-            CharParser
-                .unconsIf {
-                    let check1 = $0.value.isWhitespace
-                    let check2 = $0.index.column > start.b.index.column + 1
-                    return (check1 || check2) // any whitespace or indented chars
-                }
-                .some
-                .map(Tape.init(from:))
-                .map { start.a.with(append: start.b).with(append: start.c).with(append: $0) }
-        }
-    }
+//    public static var wholeChunk: TapeParser {
+//        Self.leader.and(TapeParser.wholeIndentedBlock).map {
+//            Tape(
+//                from: $0.a.a.flatten
+//                    .with(append: $0.a.b)
+//                    .with(append: $0.a.c)
+//                    .with(append: $0.b.flatten)
+//            )
+//        }
+//    }
     public static var leader: TripleParser<Text, Text.FatChar, Text.FatChar> {
         return Triple.joinParsers(
             f: CharParser.number.some.map(Tape.init(from:)),
@@ -322,53 +304,135 @@ extension Block.TaskListItem {
         let env = env.withScope(block: .taskListItem)
         fatalError("TODO: \(env.asPrettyTree.format())")
     }
-    public static var wholeChunk: TapeParser {
-        fatalError("TODO")
+//    public static var wholeChunk: TupleParser<Tuple<Inline.InSquareBrackets<Tape?>, Tape.FatChar>, Tape> {
+//        Self.leader.and(TapeParser.wholeIndentedBlock)
+//    }
+    public static var leader: TupleParser<Inline.InSquareBrackets<Tape?>, Tape.FatChar> {
+        let inner = Parser.options([
+            CharParser.pop("x").spaced,
+            CharParser.pop("X").spaced,
+        ])
+        let parser = Tuple.joinParsers(
+            f: Inline.InSquareBrackets
+                .parser(content: inner.optional)
+                .map { $0.map({$0.map(Tape.init(singleton:))}) },
+            g: CharParser.space
+        )
+        return parser
     }
 }
 extension Block.FencedCodeBlock {
     public static func parser(env: Environment) -> Parser<Self> {
-        let env = env.withScope(block: .fencedCodeBlock)
-        fatalError("TODO: \(env.asPrettyTree.format())")
+        let fence = TapeParser.pop("```")
+        let parser = fence.and2(TapeParser.restOfLine.optional, CharParser.next.manyUntilEnd(terminator: fence)).map {
+            Self(fenceStart: $0.a, infoString: $0.b, content: Tape(from: $0.c.a), fenceEnd: $0.c.b)
+        }
+        return parser
     }
 }
 extension Block.HorizontalRule {
     public static func parser(env: Environment) -> Parser<Self> {
-        let env = env.withScope(block: .horizontalRule)
-        fatalError("TODO: \(env.asPrettyTree.format())")
+        let options = Parser.options([
+            TapeParser.pop("***").and(CharParser.pop("*").many),
+            TapeParser.pop("---").and(CharParser.pop("-").many),
+            TapeParser.pop("___").and(CharParser.pop("_").many)
+        ])
+        let parser = options
+            .map {
+                $0.a.with(append: Tape(from: $0.b))
+            }
+            .map(Self.init(tokens:))
+        return parser
     }
 }
 extension Block.Table {
     public static func parser(env: Environment) -> Parser<Self> {
         let env = env.withScope(block: .table)
-        fatalError("TODO: \(env.asPrettyTree.format())")
-    }
-    public static var wholeChunk: TapeParser {
-        fatalError("TODO")
-    }
-}
-extension Block.TableRow {
-    public static func parser(env: Environment) -> Parser<Self> {
-        let env = env.withScope(block: .tableRow)
-        fatalError("TODO: \(env.asPrettyTree.format())")
+        let header = Block.Table.Header.parser(env: env)
+        let body = Block.Table.Row.parser(env: env).many
+        let parser = Tuple.joinParsers(f: header, g: body).map {
+            Self(header: $0.a, data: $0.b)
+        }
+        return parser
     }
 }
-extension Block.TableCell {
+extension Block.Table.Header {
     public static func parser(env: Environment) -> Parser<Self> {
-        let env = env.withScope(block: .tableCell)
-        fatalError("TODO: \(env.asPrettyTree.format())")
+        let env = env.withScope(block: .table)
+        let header = Block.Table.Row.parser(env: env)
+        let separator = Block.Table.SeperatorRow.parser(env: env)
+        let parser = Tuple.joinParsers( f: header, g: separator ).map {
+            Self(header: $0.a, separator: $0.b)
+        }
+        return parser
+    }
+}
+extension Block.Table.SeperatorRow {
+    public static func parser(env: Environment) -> Parser<Self> {
+        let pipe = CharParser.pop("|")
+        let colon = CharParser.pop(":")
+        let dashes = TapeParser
+            .pop("---")
+            .and(CharParser.char("-").many)
+            .map {
+                $0.a.with(append: Tape.init(from: $0.b))
+            }
+            .spaced
+        let seperator = Triple
+            .joinParsers(
+                f: colon.optional,
+                g: dashes,
+                h: colon.optional
+            )
+            .spaced
+        let parser = UnitParser.bounded(
+            extract: TapeParser.restOfLine.ignoring(CharParser.newline.optional),
+            execute: pipe.optional.and(seperator.someSeperatedBy(separator: pipe)).map { row in
+                let cells = row.b.flatMap { column in
+                    column.content.map {
+                        Block.Table.SeperatorRow.Cell(
+                            startColon: $0.a,
+                            dashes: $0.b,
+                            endColon: $0.c,
+                            endDelimiter: column.separator
+                        )
+                    }
+                }
+                return Self(
+                    startDelimiter: row.a,
+                    columns: cells
+                )
+            }
+        )
+        return parser
+    }
+}
+extension Block.Table.Row {
+    public static func parser(env: Environment) -> Parser<Self> {
+        let pipe = CharParser.pop("|")
+        let extractor = TapeParser.restOfLine.ignoring(CharParser.newline.optional)
+        let subparser = pipe.optional.and(CharParser.pop { $0 != "|" }.manySeperatedBy(separator: pipe.spaced.optional)).map { row in
+            let cells = row.b.map {
+                let content = [ Inline.raw(Tape(from: $0.content)) ]
+                return Block.Table.Row.Cell(content: content, pipeDelimiter: $0.separator ?? nil)
+            }
+            return Self(startDelimiter: row.a, cells: cells)
+        }
+        let parser = UnitParser.bounded(
+            extract: extractor,
+            execute: subparser
+        )
+        return parser
     }
 }
 
 extension Latex {
     public static func parser(env: Environment) -> Parser<Self> {
-//        let env = env.withScope(block: .latex)
 //        fatalError("TODO: \(env.asPrettyTree.format())")
         fatalError("TODO")
     }
 }
 
-// TODO:
  extension Inline.InDoubleQuotes {
      public static func parser(content: @autoclosure @escaping () -> Parser<Content>) -> Parser<Self> {
          let token = CharParser.pop("\"").map(Tape.init(singleton:))

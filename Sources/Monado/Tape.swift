@@ -7,6 +7,7 @@
 
 import Foundation
 import PrettyTree
+import ExtraMonadoUtils
 
 /// A `Tape` is a linked list of annotated characters. (I would call it `Text` but it's taken by `SwiftUI`'s `Text` element.)
 ///
@@ -22,18 +23,17 @@ public indirect enum Tape {
             .reduce(Tape.empty) { (rest, next) in Tape.cons(next, rest) }
     }
     public init(flatten tapes: [Tape]) {
-        var xs: [FatChar] = []
-        for x in tapes.flatMap({ $0.flatten }) {
-            xs.append(x)
-        }
-        self = Tape(from: xs)
+        self = tapes
+            .flatMap { $0.flatten }
+            .reversed()
+            .reduce(Tape.empty) { (rest, next) in Tape.cons(next, rest) }
     }
     /// Initializes a `Tape` with a single character, creating a singleton list.
     public init(singleton head: FatChar) {
         self = .cons(head, .empty)
     }
     /// Initializes a `Tape` from a `String`, annotating each character with its position index.
-    public init(from string: String) {
+    public init(initalize string: String) {
         var position = PositionIndex.zero
         let chars = string.map {
             let result = FatChar(value: $0, index: position)
@@ -156,6 +156,26 @@ extension Tape {
         case .empty: return nil
         }
     }
+    func transformLines(_ f: @escaping (Tape) -> Tape) -> Tape {
+        var lines: [[FatChar]] = []
+        var current: [FatChar] = []
+        for x in flatten {
+            if x.value.isNewline {
+                lines.append(current.with(append: x))
+                current = []
+                continue
+            }
+            current.append(x)
+        }
+        let all = lines.with(append: current)
+        let newLines = all.map { line in
+            f(Tape(from: line))
+        }
+        return Tape.init(flatten: newLines)
+    }
+    func filter(_ predicate: @escaping (FatChar) -> Bool) -> Tape {
+        Tape(from: flatten.filter(predicate))
+    }
 }
 
 extension Tape: CustomDebugStringConvertible {
@@ -189,10 +209,11 @@ extension Tape: ToPrettyTree {
 }
 extension Tape.FatChar: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
-        return PrettyTree(label: "Tape.Char", children: [
-            PrettyTree(key: "value", value: value),
-            PrettyTree(key: "index", value: index),
-        ])
+//        return PrettyTree(label: "Tape.Char", children: [
+//            PrettyTree(key: "value", value: value),
+//            PrettyTree(key: "index", value: index),
+//        ])
+        return .value("Tape.FatChar(\(value.debugDescription))")
     }
 }
 extension Tape.PositionIndex: ToPrettyTree {

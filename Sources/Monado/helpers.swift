@@ -99,13 +99,21 @@ public struct Quadruple<A, B, C, D> {
         self.d = d
     }
 }
+public struct SeperatedBy<A, B> {
+    public let content: [A]
+    public let separator: B?
+}
+public struct SeperatedByEndBy<A, B, C> {
+    public let rows: [ SeperatedBy<A, B> ]
+    public let terminal: C?
+}
 
 // MARK: - DEBUG -
 extension Either: ToPrettyTree where Left: ToPrettyTree, Right: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
         switch self {
-        case .left(let left): return PrettyTree(key: "left", value: left.asPrettyTree)
-        case .right(let right): return PrettyTree(key: "right", value: right.asPrettyTree)
+        case .left(let left): return PrettyTree(key: ".left", value: left.asPrettyTree)
+        case .right(let right): return PrettyTree(key: ".right", value: right.asPrettyTree)
         }
     }
 }

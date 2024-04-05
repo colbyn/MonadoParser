@@ -72,6 +72,30 @@ public struct Parser<A> {
         case err(state: ParserState)
     }
 }
+
+extension Parser.Output {
+    public func andThen<B>(_ function: @escaping (A, ParserState) -> Parser<B>.Output) -> Parser<B>.Output {
+        switch self {
+        case .ok(let value, let state):
+            return function(value, state)
+        case .err(let state):
+            return state.err()
+        }
+    }
+    public func or<B>(_ function: @escaping (ParserState) -> Parser<B>.Output) -> Parser<Either<A, B>>.Output {
+        switch self {
+        case .ok(let value, let state):
+            return state.ok(value: Either.left(value))
+        case .err(let state):
+            switch function(state) {
+            case .ok(value: let b, state: let state): return state.ok(value: Either.right(b))
+            case .err(state: let state): return state.err()
+            }
+        }
+    }
+}
+
+
 /// Encapsulates the state of the parser, including the remaining input (`Tape`) and any debugging scopes.
 ///
 /// - tape: The current position and remaining input for the parser to consume.

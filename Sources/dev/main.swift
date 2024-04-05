@@ -12,7 +12,8 @@ import Markdown
 let source1 = """
 - Boil water in a kettle.
   - Use filtered water for a better taste.
-- Place a tea bag in your cup.
+
+ - Place a tea bag in your cup.
   - Green tea for a lighter flavor.
   - Black tea for a stronger flavor.
 - Pour boiling water into the cup.
@@ -36,29 +37,70 @@ let source2 = """
     - Add honey or lemon if desired.
 """
 let source3 = """
-This is a multi-line paragraph in Markdown. You can write as much as you want
-here and as long as you don't insert a blank line, it will be considered part
-of the same paragraph. This allows for natural writing flow similar to
-traditional text editors.
-The new line here will be treated as a space in HTML.
-
-This is a multi-line paragraph in Markdown. You can write as much as you want here and as long as you don't insert a blank line, it will be considered part of the same paragraph.
-This allows for natural writing flow similar to traditional text editors.
-The new line here will be treated as a space in HTML.
+- Boil water in a kettle.
+  - Use filtered water for a better taste.
+ - Place a tea bag in your cup.
+  - Green tea for a lighter flavor.
+  - Black tea for a stronger flavor.
+- Pour boiling water into the cup.
+- Let the tea steep for 3-5 minutes.
+  - 3 minutes for a lighter taste.
+  - 5 minutes for a stronger brew.
+- Enjoy your tea.
+  - Add honey or lemon if desired.
+1. Boil water in a kettle.
+    - Use filtered water for a better taste.
+2. Place a tea bag in your cup.
+    - Green tea for a lighter flavor.
+    - Black tea for a stronger flavor.
+3. Pour boiling water into the cup.
+4. Let the tea steep for 3-5 minutes.
+    - 3 minutes for a lighter taste.
+    - 5 minutes for a stronger brew.
+5. Enjoy your tea.
+    - Add honey or lemon if desired.
 """
 
-//let parser = TapeParser.restOfLine
-let parser = Block.Paragraph.wholeChunk
-//let parser = Block.Blockquote.wholeChunk
-//let parser = Block.UnorderedListItem.wholeChunk.some
-//let parser = Block.OrderedListItem.wholeChunk.some
+let sample = """
+- Hello World
+  Hello World
+  Hello World
+"""
 
-let (result, unparsed) = parser.evaluate(source: source3)
+//let parser = Parser
+//    .options([
+//        Block.UnorderedListItem.parser(env: .root).map(Block.unorderedListItem),
+//        Block.OrderedListItem.parser(env: .root).map(Block.orderedListItem),
+//        CharParser.newline.map(Block.newline),
+//    ])
+//    .many
+//let parser = CharParser.next
+let parser = TapeParser.pop("- ").and(
+    UnitParser.bounded(
+        extract: TapeParser.wholeIndentedBlock(deindent: true),
+        execute: Parser
+            .options([
+                TapeParser.pop("Hello World"),
+                TapeParser.pop("\n"),
+            ])
+            .many
+    )
+)
+
+let (result, unparsed) = parser.evaluate(source: sample)
 if let result = result {
-    print("RESULTS:")
+    header(label: "RESULTS")
     print(result.asPrettyTree.format())
 } else {
-    print("RESULTS: Error")
+    header(label: "ERROR!")
 }
-print("UNPARSED")
+header(label: "FINAL PARSER STATE!")
 print(unparsed.asPrettyTree.format())
+header(label: "UNPARSED")
+print(unparsed.tape.asString.truncated(limit: 300, position: .tail))
+
+func header(label: String) {
+    print(String.init(repeating: "—", count: 120))
+    print("▷ \(label)")
+    print(String.init(repeating: "—", count: 120))
+}

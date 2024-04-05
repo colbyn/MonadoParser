@@ -12,6 +12,7 @@ import PrettyTree
 
 public struct Environment {
     let scopes: [ Scope ]
+    public static let root: Self = Environment(scopes: [])
 }
 
 extension Environment {

@@ -4,6 +4,7 @@
 //
 //  Created by Colbyn Wadman on 3/28/24.
 //
+// This file contains Monado’s core monadic parser combinators.
 
 import Foundation
 
@@ -22,7 +23,7 @@ extension Parser {
     /// print(result) // Prints "(Optional(42), ParserState(...))"
     /// ```
     public func evaluate(source: String) -> (A?, ParserState) {
-        let state = ParserState.root(tape: Tape(from: source))
+        let state = ParserState.root(tape: Tape(initalize: source))
         switch self.binder(state) {
         case .ok(value: let a, state: let state): return (a, state)
         case .err(state: let state): return (nil, state)
@@ -96,6 +97,21 @@ extension UnitParser {
                 }
             case .err(state: let state): return state.err()
             }
+        }
+    }
+    public static func bounded<T>(
+        extract extractor: @escaping @autoclosure () -> TapeParser,
+        execute subparser: @escaping @autoclosure () -> Parser<T>
+    ) -> Parser<(T)> {
+        Parser<(T)> {
+            guard case .ok(value: let leading, state: let trailing) = extractor().binder($0) else {
+                return $0.err()
+            }
+            let forkedState = trailing.set(tape: leading)
+            guard case .ok(value: let value, state: let rest) = subparser().binder(forkedState) else {
+                return $0.err()
+            }
+            return rest.set(tape: rest.tape.with(append: trailing.tape)).ok(value: value)
         }
     }
 }
@@ -372,8 +388,8 @@ extension Parser {
             switch self.binder($0) {
             case .ok(value: let a, state: let rest):
                 return rest.ok(value: a)
-            case .err(state: _):
-                return $0.ok(value: nil)
+            case .err(state: let rest):
+                return rest.ok(value: nil)
             }
         }
     }
@@ -486,6 +502,61 @@ extension Parser {
                 }
             }
             return $0.err()
+        }
+    }
+    private func sequenceSeperatedByEndBy<B, C>(
+        separator: @autoclosure @escaping () -> Parser<B>,
+        terminator: @autoclosure @escaping () -> Parser<C>,
+        useTerminator: Bool,
+        allowEmpty: Bool
+    ) -> Parser<SeperatedByEndBy<A, B, C>> {
+        Parser<SeperatedByEndBy<A, B, C>> {
+            let _ = $0
+            var results: [ SeperatedBy<A, B> ] = []
+            var current: ParserState = $0
+            loop: while !current.tape.isEmpty {
+                // - -
+                if useTerminator {
+                    switch terminator().binder(current) {
+                    case .ok(value: let c, state: let rest0):
+                        if !allowEmpty, results.isEmpty {
+                            return $0.err()
+                        }
+                        return rest0.ok(value: SeperatedByEndBy(rows: results, terminal: c))
+                    case .err: ()
+                    }
+                }
+                // - -
+                switch self.some.and(separator()).binder(current) {
+                case .ok(value: let entry, state: let rest):
+                    results.append(SeperatedBy(content: entry.a, separator: entry.b))
+                    current = rest
+                    continue loop
+                case .err:
+                    break loop
+                }
+//                switch self.binder(current) {
+//                case .ok(value: let a, state: let rest1):
+//                    // - -
+//                    current = rest1
+//                    // - -
+//                    switch separator().binder(rest1) {
+//                    case .ok(value: let b, state: let rest2):
+//                        current = rest2
+////                        results.append(Tuple(a, b))
+//                        continue loop
+//                    case .err:
+//                        break loop
+//                    }
+//                case .err:
+//                    // - -
+//                    break loop
+//                }
+            }
+            if !allowEmpty, results.isEmpty {
+                return $0.err()
+            }
+            return current.ok(value: SeperatedByEndBy(rows: results, terminal: nil))
         }
     }
     // MARK: - BASIC MANY COMBINATORS -
@@ -628,6 +699,31 @@ extension Parser {
     public func someUntilEnd<B>(terminator: @escaping () -> Parser<B>) -> TupleParser<[A], B> {
         self.sequenceUntilEnd(allowEmptyResults: false, terminator: terminator)
     }
+    // MARK: - NEW -
+    public func manySeperatedBy<B>(
+        separator: @autoclosure @escaping () -> Parser<B>
+    ) -> Parser<[SeperatedBy<A, B>]> {
+        sequenceSeperatedByEndBy(separator: separator(), terminator: UnitParser.fail, useTerminator: false, allowEmpty: true)
+            .map { $0.rows }
+    }
+    public func someSeperatedBy<B>(
+        separator: @autoclosure @escaping () -> Parser<B>
+    ) -> Parser<[SeperatedBy<A, B>]> {
+        sequenceSeperatedByEndBy(separator: separator(), terminator: UnitParser.fail, useTerminator: false, allowEmpty: false)
+            .map { $0.rows }
+    }
+    public func manySeperatedBy<B, C>(
+        separator: @autoclosure @escaping () -> Parser<B>,
+        terminator: @autoclosure @escaping () -> Parser<C>
+    ) -> Parser<SeperatedByEndBy<A, B, C>> {
+        sequenceSeperatedByEndBy(separator: separator(), terminator: terminator(), useTerminator: true, allowEmpty: true)
+    }
+    public func someSeperatedBy<B, C>(
+        separator: @autoclosure @escaping () -> Parser<B>,
+        terminator: @autoclosure @escaping () -> Parser<C>
+    ) -> Parser<SeperatedByEndBy<A, B, C>> {
+        sequenceSeperatedByEndBy(separator: separator(), terminator: terminator(), useTerminator: true, allowEmpty: false)
+    }
     /// Encloses the parser within leading and trailing terminators, returning the parsed value flanked by the terminators' results.
     ///
     /// - Parameter bothEnds: A parser that matches both the leading and trailing delimiters.
@@ -756,6 +852,20 @@ extension Parser {
             switch self.binder($0) {
             case .ok(value: _, state: let rest):
                 return rest.ok(value: ())
+            case .err(state: let out): return out.err()
+            }
+        }
+    }
+    public func notFollowedBy<B>(_ parser: @autoclosure @escaping () -> Parser<B>) -> Parser<A> {
+        Parser<A> {
+            switch self.binder($0) {
+            case .ok(value: let a, state: let rest):
+                switch parser().binder(rest) {
+                case .err(state: _):
+                    return rest.ok(value: a)
+                case .ok(value: _, state: _):
+                    return $0.err()
+                }
             case .err(state: let out): return out.err()
             }
         }
@@ -945,6 +1055,14 @@ extension CharParser {
             return rest.ok(value: head)
         }
     }
+    public static func char(_ pattern: Character) -> Self {
+        Self {
+            guard let (head, rest) = $0.uncons(pattern: pattern) else {
+                return $0.err()
+            }
+            return rest.ok(value: head)
+        }
+    }
     /// Parses the next character if it satisfies the given predicate.
     public static func unconsIf(_ predicate: @escaping (Tape.FatChar) -> Bool) -> Self {
         Self {
@@ -1015,6 +1133,9 @@ extension TapeParser {
             return rest.ok(value: head)
         }
     }
+    public static func token(_ pattern: String) -> Self {
+        self.pop(pattern)
+    }
     /// A parser that consumes and returns any whitespace characters it encounters, except for newline characters.
     ///
     /// - Returns: A parser that consumes leading whitespace from the input and returns a `Tape` containing the consumed whitespace characters, up until a non-whitespace or newline character is encountered.
@@ -1043,7 +1164,30 @@ extension TapeParser {
     public static var restOfLine: Self {
         CharParser.pop { !$0.isNewline }.some.map(Tape.init(from:))
     }
-    public static func manyUntilTerm<T>(terminator: @escaping @autoclosure () -> Parser<T>) -> Parser<Tuple<Tape, T>> {
+    public static func wholeIndentedBlock(deindent: Bool) -> Self {
+        let parser: (Tape.PositionIndex) -> TapeParser = { start in
+            CharParser
+                .unconsIf {
+                    let check1 = $0.value.isWhitespace
+                    let check2 = $0.index.column >= start.column
+                    return (check1 || check2) // any whitespace or indented chars
+                }
+                .some
+                .map(Tape.init(from:))
+        }
+        return Self {
+            guard let (head, _) = $0.tape.uncons else { return $0.ok(value: Tape.empty) }
+            let f: (Tape) -> Tape = {
+                $0.transformLines {
+                    $0.filter {
+                        $0.index.column >= head.index.column
+                    }
+                }
+            }
+            return parser(head.index).map(f).binder($0)
+        }
+    }
+    public static func consumeManyUntilTerm<T>(terminator: @escaping @autoclosure () -> Parser<T>) -> Parser<Tuple<Tape, T>> {
         Parser<Tuple<Tape, T>> {
             var characters: [ Tape.FatChar ] = []
             var current: ParserState = $0
@@ -1151,5 +1295,13 @@ extension Quadruple {
         i: @escaping @autoclosure () -> Parser<D>
     ) -> QuadrupleParser<A, B, C, D> {
         f().and3(g(), h(), i())
+    }
+}
+extension Either {
+    public static func joinParsers(
+        left: @escaping @autoclosure () -> Parser<Left>,
+        right: @escaping @autoclosure () -> Parser<Right>
+    ) -> EitherParser<Left, Right> {
+        left().eitherOr(right())
     }
 }

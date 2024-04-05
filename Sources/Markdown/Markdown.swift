@@ -32,7 +32,7 @@ public typealias OpenSquareBracket = Token
 public typealias CloseSquareBracket = Token
 
 public enum Markdown {
-    case inline(Inline), block(Block), raw(Tape)
+    case inline(Inline), block(Block)
 }
 
 public enum Inline {
@@ -47,6 +47,7 @@ public enum Inline {
     case inlineCode(InlineCode)
     case latex(Latex)
     case lineBreak(Token)
+    case raw(Tape)
     public struct PlainText {
         public let value: Tape
     }
@@ -115,6 +116,9 @@ public enum Inline {
         public let openSquareBracket: OpenSquareBracket
         public let content: Content
         public let closeSquareBracket: CloseSquareBracket
+        public func map<Result>(_ function: @escaping (Content) -> Result) -> InSquareBrackets<Result> {
+            InSquareBrackets<Result>(openSquareBracket: openSquareBracket, content: function(content), closeSquareBracket: closeSquareBracket)
+        }
     }
 }
 
@@ -131,8 +135,7 @@ public enum Block {
     case fencedCodeBlock(FencedCodeBlock)
     case horizontalRule(HorizontalRule)
     case table(Table)
-    case tableRow(TableRow)
-    case tableCell(TableCell)
+    case newline(Tape.FatChar)
     public struct Heading {
         /// Markdown allows for 1-6 `#` characters for headings
         public let hashTokens: Token
@@ -189,22 +192,40 @@ public enum Block {
         public let tokens: Token
     }
     public struct Table {
-        public let rows: [ TableRow ]
+        public let header: Header
+        public let data: [ Row ]
     }
-    public struct TableRow {
+}
+
+extension Block.Table {
+    public struct Header {
+        public let header: Row
+        public let separator: SeperatorRow
+    }
+    public struct SeperatorRow {
         /// Optionally, a table row might start with a delimiter if the table format specifies it.
-        public let startDelimiter: Token?
+        public let startDelimiter: Token.FatChar?
         /// The cells within the row.
-        public let cells: [TableCell]
-        /// Optionally, a table row might end with a delimiter.
-        public let endDelimiter: Token?
+        public let columns: [ Cell ]
+        public struct Cell {
+            public let startColon: Token.FatChar?
+            public let dashes: Tape
+            public let endColon: Token.FatChar?
+            public let endDelimiter: Token.FatChar?
+        }
     }
-    public struct TableCell {
-        /// Content of the cell. This could include inline formatting, links, etc.
-        public let content: [Inline]
-        /// Delimiter token to separate this cell from the next. This could be considered optional,
-        /// as the last cell in a row might not have a trailing delimiter in some Markdown formats.
-        public let separator: Token?
+    public struct Row {
+        /// Optionally, a table row might start with a delimiter if the table format specifies it.
+        public let startDelimiter: Token.FatChar?
+        /// The cells within the row.
+        public let cells: [ Cell ]
+        public struct Cell {
+            /// Content of the cell. This could include inline formatting, links, etc.
+            public let content: [Inline]
+            /// Delimiter token to separate this cell from the next. This could be considered optional,
+            /// as the last cell in a row might not have a trailing delimiter in some Markdown formats.
+            public let pipeDelimiter: Token.FatChar?
+        }
     }
 }
 
