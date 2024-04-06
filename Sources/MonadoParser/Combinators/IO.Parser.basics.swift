@@ -153,7 +153,7 @@ extension IO.Parser {
         return self.putBack(text: char.map {.cons($0, .empty)})
     }
     public func manyUnless<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B?> {
-        let until = IO.ControlFlowParser.wrap(try: terminator())
+        let until = IO.ControlFlowParser.wrap(flip: terminator())
         let settings = IO.SequenceSettings(
             allowEmpty: true,
             until: { until }
@@ -161,7 +161,7 @@ extension IO.Parser {
         return sequence(settings: settings).and(next: terminator().optional)
     }
     public func someUnless<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B?> {
-        let until = IO.ControlFlowParser.wrap(try: terminator())
+        let until = IO.ControlFlowParser.wrap(flip: terminator())
         let settings = IO.SequenceSettings(
             allowEmpty: false,
             until: { until }
@@ -169,7 +169,7 @@ extension IO.Parser {
         return sequence(settings: settings).and(next: terminator().optional)
     }
     public func manyTill<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B> {
-        let until = IO.ControlFlowParser.wrap(try: terminator())
+        let until = IO.ControlFlowParser.wrap(flip: terminator())
         let settings = IO.SequenceSettings(
             allowEmpty: true,
             until: { until }
@@ -177,7 +177,7 @@ extension IO.Parser {
         return sequence(settings: settings).and(next: terminator())
     }
     public func someTill<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B> {
-        let until = IO.ControlFlowParser.wrap(try: terminator())
+        let until = IO.ControlFlowParser.wrap(flip: terminator())
         let settings = IO.SequenceSettings(
             allowEmpty: false,
             until: { until }

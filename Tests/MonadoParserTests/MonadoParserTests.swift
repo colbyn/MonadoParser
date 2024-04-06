@@ -25,6 +25,7 @@ final class MonadoParserTests: XCTestCase {
         XCTAssertNotNil(result1); XCTAssertEqual(unparsed1.text.asString, " World!")
         XCTAssertNil(result2); XCTAssertEqual(unparsed2.text.asString, sample)
     }
+    
     func testRandom3() {
         let sample = "123"
         let parser1 = IO.CharParser.head.and(next: IO.CharParser.head).andThen {

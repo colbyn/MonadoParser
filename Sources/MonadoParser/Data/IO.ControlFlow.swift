@@ -33,11 +33,11 @@ extension IO.ControlFlow {
 
 extension IO.ControlFlowParser {
     public static let noop: Self = IO.ControlFlowParser.pure(value: .continue)
-    public static func wrap<T>(try parser: @escaping @autoclosure () -> IO.Parser<T>) -> Self {
+    public static func wrap<T>(flip parser: @escaping @autoclosure () -> IO.Parser<T>) -> Self {
         Self {
             switch parser().binder($0) {
-            case .continue: return $0.continue(value: .continue)
-            case .break: return $0.continue(value: .break)
+            case .continue: return $0.continue(value: .break)
+            case .break: return $0.continue(value: .continue)
             }
         }
     }
