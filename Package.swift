@@ -24,6 +24,6 @@ let package = Package(
         .target(name: "Markup", dependencies: [ "Monado", "ExtraMonadoUtils" ]),
         .target(name: "Markdown", dependencies: [ "Monado", "ExtraMonadoUtils" ]),
         .executableTarget(name: "dev", dependencies: [ "Monado", "Markup", "Markdown", "ExtraMonadoUtils" ]),
-//        .testTarget(name: "MonadoParserTests", dependencies: ["MonadoParser"]),
+        .testTarget(name: "MonadoParserTests", dependencies: [ "MonadoParser", "PrettyTree", "ExtraMonadoUtils" ]),
     ]
 )
