@@ -90,3 +90,24 @@ extension IO.Parser {
     }
 }
 
+extension IO.Parser {
+    /// Evaluates the parser against a given source string, producing either a parsed value or nil if parsing fails, along with the final parser state.
+    ///
+    /// - Parameters:
+    ///   - source: The input string to be parsed.
+    /// - Returns: A tuple containing the optional parsed value and the final state of the parser.
+    ///
+    /// Example:
+    /// ```swift
+    /// let parser = Parser<Int>.pure(value: 42)
+    /// let result = parser.evaluate(source: "input string")
+    /// print(result) // Prints "(Optional(42), ParserState(...))"
+    /// ```
+    public func evaluate(source: String) -> (A?, IO.State) {
+        let state = IO.State(text: IO.Text(initalize: source))
+        switch self.binder(state) {
+        case .continue(value: let a, state: let state): return (a, state)
+        case .break(state: let state): return (nil, state)
+        }
+    }
+}
