@@ -70,6 +70,12 @@ extension IO.Either where Left == Right {
         case .right(let right): return right
         }
     }
+    public static func unwrap(value: IO.Either<Left, Right>) -> Left {
+        switch value {
+        case .left(let left): return left
+        case .right(let right): return right
+        }
+    }
 }
 
 // MARK: - DEBUG -

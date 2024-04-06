@@ -14,7 +14,6 @@ extension IO {
         case empty, cons(FatChar, Text)
     }
     public typealias TextParser = Parser<Text>
-    public typealias CharParser = Parser<Text.FatChar>
 }
 
 extension IO.Text {
@@ -43,29 +42,80 @@ extension IO.Text {
         }
         self = .init(from: chars)
     }
-}
-
-extension IO.Text {
-    /// A `FatChar` is a Swift `Character` with metadata denoting its original source code position.
-    ///
-    /// Represents an annotated character within the `Tape`, including its value and position in the original input.
-    public struct FatChar {
-        public let value: Character
-        public let index: PositionIndex
-    }
-    /// Models the position of a character in the input, supporting detailed parsing error messages and context analysis.
-    public struct PositionIndex {
-        public let character: UInt
-        public let column: UInt
-        public let line: UInt
-        public static let zero = Self(character: 0, column: 0, line: 0)
-        /// Advances the position index based on the given character, accommodating line breaks.
-        public func advance(for character: Character) -> Self {
-            if character.isNewline {
-                return Self(character: self.character + 1, column: 0, line: line + 1)
-            }
-            return Self(character: self.character + 1, column: column + 1, line: line)
+    /// Appends another `Tape` to this one.
+    public func with(append tail: IO.Text?) -> IO.Text {
+        if let tail = tail {
+            let xs = self.chars
+            let ys = tail.chars
+            return IO.Text(from: xs.with(append: ys))
         }
+        return self
+    }
+    public func with(append char: IO.Text.FatChar) -> IO.Text {
+        let xs = self.chars.with(append: [char])
+        return IO.Text(from: xs)
+    }
+    func filter(_ predicate: @escaping (FatChar) -> Bool) -> IO.Text {
+        IO.Text(from: chars.filter(predicate))
+    }
+    /// Attempts to consume the next character, returning it along with the rest of the `Tape`.
+    public var uncons: (FatChar, IO.Text)? {
+        switch self {
+        case .empty: return nil
+        case .cons(let char, let tape): return (char, tape)
+        }
+    }
+    /// Attempts to consume a specified number of characters, returning them and the remaining `Tape`.
+    public func take(count: UInt) -> ([FatChar], IO.Text) {
+        if count == 0 {
+            return ([], self)
+        }
+        switch self {
+        case .empty: return ([], .empty)
+        case .cons(let char, let tape):
+            let (xs, rest) = tape.take(count: count - 1)
+            return ([char].with(append: xs), rest)
+        }
+    }
+    /// Splits the `Tape` at a prefix string, returning the matched segment and the rest.
+    public func split(prefix: String) -> (IO.Text, IO.Text)? {
+        let (tokens, rest) = self.take(count: UInt(prefix.count))
+        if tokens.count == prefix.count {
+            let isMatch = zip(prefix, tokens).allSatisfy { (l, r) in l == r.value }
+            if isMatch {
+                return (IO.Text(from: tokens), rest)
+            }
+        }
+        return nil
+    }
+    /// Attempts to consume a character matching a specific pattern.
+    public func uncons(pattern: Character) -> (FatChar, IO.Text)? {
+        guard let (head, rest) = self.uncons else { return nil }
+        guard head.value == pattern else { return nil }
+        return (head, rest)
+    }
+    /// Attempts to consume a character satisfying a given predicate.
+    public func unconsIf(predicate: @escaping (IO.Text.FatChar) -> Bool) -> (FatChar, IO.Text)? {
+        guard let (head, rest) = self.uncons else { return nil }
+        guard predicate(head) else { return nil }
+        return (head, rest)
+    }
+    func transformLines(_ f: @escaping (IO.Text) -> IO.Text) -> IO.Text {
+        var lines: [[FatChar]] = []
+        var current: [FatChar] = []
+        for x in chars {
+            if x.value.isNewline {
+                lines.append(current.with(append: x))
+                current = []
+                continue
+            }
+            current.append(x)
+        }
+        let all = lines.with(append: current)
+        let newLines = all.map { line in
+            f(IO.Text(from: line))
+        }
+        return IO.Text.init(flatten: newLines)
     }
 }
 
@@ -93,9 +143,26 @@ extension IO.Text: CustomDebugStringConvertible {
     }
 }
 
-extension IO.Text.FatChar {
-    public var singleton: IO.Text {
-        IO.Text(singleton: self)
+extension IO.TextParser {
+    /// Creates a parser that consumes a specific string pattern from the input.
+    ///
+    /// This parser matches and consumes the exact sequence of characters defined by the given pattern. It's particularly useful for recognizing specific keywords, symbols, or other fixed sequences within a larger text stream.
+    ///
+    /// - Parameter pattern: The exact string sequence to match and consume.
+    /// - Returns: A parser that consumes the specified string pattern if it matches the beginning of the input.
+    ///
+    /// Example:
+    /// ```swift
+    /// let keywordParser = TapeParser.pop("func")
+    /// // Consumes the keyword "func" from the input, if present.
+    /// ```
+    public static func token(_ pattern: String) -> Self {
+        Self {
+            guard let (head, rest) = $0.text.split(prefix: pattern) else {
+                return $0.break()
+            }
+            return $0.set(text: rest).continue(value: head)
+        }
     }
 }
 
@@ -103,11 +170,6 @@ extension IO.Text.FatChar {
 extension IO.Text: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
         return PrettyTree.string(asString)
-    }
-}
-extension IO.Text.FatChar: ToPrettyTree {
-    public var asPrettyTree: PrettyTree {
-        return .value("Text.FatChar(\(value.debugDescription))")
     }
 }
 extension IO.Text.PositionIndex: ToPrettyTree {

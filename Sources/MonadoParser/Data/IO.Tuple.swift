@@ -31,11 +31,11 @@ extension IO.Tuple {
         IO.Tuple<A, T>(a, f(b))
     }
     public static func join(
-        a: @autoclosure @escaping () -> IO.Parser<A>,
-        b: @autoclosure @escaping () -> IO.Parser<B>
+        f: @autoclosure @escaping () -> IO.Parser<A>,
+        g: @autoclosure @escaping () -> IO.Parser<B>
     ) -> IO.TupleParser<A, B> {
-        a().andThen { a in
-            b().andThen { b in
+        f().andThen { a in
+            g().andThen { b in
                 IO.Parser.pure(value: Self(a, b))
             }
         }

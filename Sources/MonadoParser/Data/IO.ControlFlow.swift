@@ -31,6 +31,10 @@ extension IO.ControlFlow {
     }
 }
 
+extension IO.ControlFlowParser {
+    public static let noop: Self = IO.ControlFlowParser.pure(value: .continue)
+}
+
 // MARK: - DEBUG -
 extension IO.ControlFlow: ToPrettyTree {
     public var asPrettyTree: PrettyTree {

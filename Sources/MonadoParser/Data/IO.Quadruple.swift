@@ -29,10 +29,10 @@ extension IO {
 
 extension IO.Quadruple {
     public static func join(
-        a: @autoclosure @escaping () -> IO.Parser<A>,
-        b: @autoclosure @escaping () -> IO.Parser<B>,
-        c: @autoclosure @escaping () -> IO.Parser<C>,
-        d: @autoclosure @escaping () -> IO.Parser<D>
+        f a: @autoclosure @escaping () -> IO.Parser<A>,
+        g b: @autoclosure @escaping () -> IO.Parser<B>,
+        h c: @autoclosure @escaping () -> IO.Parser<C>,
+        i d: @autoclosure @escaping () -> IO.Parser<D>
     ) -> IO.QuadrupleParser<A, B, C, D> {
         a().andThen { a in
             b().andThen { b in

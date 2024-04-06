@@ -39,9 +39,9 @@ extension IO.Triple {
         IO.Triple<A, B, T>(a, b, f(c))
     }
     public static func join(
-        a: @autoclosure @escaping () -> IO.Parser<A>,
-        b: @autoclosure @escaping () -> IO.Parser<B>,
-        c: @autoclosure @escaping () -> IO.Parser<C>
+        f a: @autoclosure @escaping () -> IO.Parser<A>,
+        g b: @autoclosure @escaping () -> IO.Parser<B>,
+        h c: @autoclosure @escaping () -> IO.Parser<C>
     ) -> IO.TripleParser<A, B, C> {
         a().andThen { a in
             b().andThen { b in

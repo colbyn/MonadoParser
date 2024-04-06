@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import PrettyTree
 
 extension IO {
     public struct State {
@@ -22,5 +23,14 @@ extension IO.State {
     }
     internal func set(text: IO.Text) -> Self {
         Self(text: text)
+    }
+}
+
+// MARK: - DEBUG -
+extension IO.State: ToPrettyTree {
+    public var asPrettyTree: PrettyTree {
+        return PrettyTree(label: "IO.State", children: [
+            PrettyTree(key: "text", value: PrettyTree.string(text.asString)),
+        ])
     }
 }
