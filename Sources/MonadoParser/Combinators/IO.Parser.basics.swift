@@ -184,5 +184,24 @@ extension IO.Parser {
         )
         return sequence(settings: settings).and(next: terminator())
     }
+    
+    /// Creates a parser that ignores trailing whitespace after parsing the value.
+    ///
+    /// - Returns: A parser that ignores trailing whitespace.
+    public var spacedRight: IO.Parser<A> {
+        self.ignore(right: IO.TextParser.spaces.optional)
+    }
+    /// Creates a parser that ignores leading whitespace before parsing the value.
+    ///
+    /// - Returns: A parser that ignores leading whitespace.
+    public var spacedLeft: IO.Parser<A> {
+        IO.TextParser.spaces.optional.keep(right: self)
+    }
+    /// Creates a parser that ignores both leading and trailing whitespace around the parsed value.
+    ///
+    /// - Returns: A parser that ignores surrounding whitespace.
+    public var spaced: IO.Parser<A> {
+        IO.TextParser.spaces.optional.keep(right: self).ignore(right: IO.TextParser.spaces.optional)
+    }
 }
 

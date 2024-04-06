@@ -164,6 +164,11 @@ extension IO.TextParser {
             return $0.set(text: rest).continue(value: head)
         }
     }
+    public static var spaces: Self {
+        IO.CharParser.char { $0.isWhitespace && !$0.isNewline }
+            .many
+            .map { IO.Text(from: $0) }
+    }
 }
 
 // MARK: - DEBUG -
