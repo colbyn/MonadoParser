@@ -35,7 +35,7 @@ extension IO.Parser {
                     let type = "Parser<[\(type(of: A.self))]>.sequence"
                     print("\(type) WARNING: TOO MANY ITERATIONS")
                 }
-                if let until = settings.until, case .break = until().binder(current) {
+                if let until = settings.until, case .continue(value: .terminate, state: _) = until().binder(current) {
                     break loop
                 }
                 switch self.binder(current) {

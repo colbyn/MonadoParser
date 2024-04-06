@@ -10,8 +10,8 @@ import PrettyTree
 
 extension IO {
     public enum ControlFlow {
-        case `continue`
-        case `break`
+        case noop
+        case terminate
     }
     public typealias ControlFlowParser = Parser<ControlFlow>
 }
@@ -19,25 +19,25 @@ extension IO {
 extension IO.ControlFlow {
     public var isContinue: Bool {
         switch self {
-        case .continue: return true
+        case .noop: return true
         default: return false
         }
     }
     public var isBreak: Bool {
         switch self {
-        case .break: return true
+        case .terminate: return true
         default: return false
         }
     }
 }
 
 extension IO.ControlFlowParser {
-    public static let noop: Self = IO.ControlFlowParser.pure(value: .continue)
+    public static let noop: Self = IO.ControlFlowParser.pure(value: .noop)
     public static func wrap<T>(flip parser: @escaping @autoclosure () -> IO.Parser<T>) -> Self {
         Self {
             switch parser().binder($0) {
-            case .continue: return $0.continue(value: .break)
-            case .break: return $0.continue(value: .continue)
+            case .continue: return $0.continue(value: .terminate)
+            case .break: return $0.continue(value: .noop)
             }
         }
     }
@@ -47,8 +47,8 @@ extension IO.ControlFlowParser {
 extension IO.ControlFlow: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
         switch self {
-        case .continue: return .value("ControlFlow.continue")
-        case .break: return .value("ControlFlow.break")
+        case .noop: return .value("ControlFlow.continue")
+        case .terminate: return .value("ControlFlow.break")
         }
     }
 }
