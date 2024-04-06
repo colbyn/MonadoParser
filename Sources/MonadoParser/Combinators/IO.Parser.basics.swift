@@ -40,14 +40,6 @@ extension IO.Parser {
     ///
     /// - Parameter right: A parser to be executed after the current parser, whose result will be returned.
     /// - Returns: A parser that returns the result of the second parser if both parsers succeed; otherwise, it fails with the state of the first failure encountered.
-    ///
-    /// Example:
-    /// ```swift
-    /// let ignoreWhitespace = Parser<String>.whitespace
-    /// let digitParser = CharParser.pop { $0.isNumber }
-    /// let parseDigitAfterSpace = ignoreWhitespace.keepRight(digitParser)
-    /// // Consumes and ignores whitespace, then parses and returns the next digit.
-    /// ```
     public func keep<B>(right f: @escaping @autoclosure () -> IO.Parser<B>) -> IO.Parser<B> {
         andThen { _ in f() }
     }
@@ -55,7 +47,6 @@ extension IO.Parser {
     ///
     /// - Parameter right: The parser whose result is to be ignored.
     /// - Returns: A parser that returns the result of the first parser while ignoring the result of the second.
-    ///
     public func ignore<B>(right f: @escaping @autoclosure () -> IO.Parser<B>) -> IO.Parser<A> {
         andThen { a in f().set(pure: a) }
     }
