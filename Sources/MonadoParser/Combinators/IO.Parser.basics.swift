@@ -89,11 +89,11 @@ extension IO.Parser {
     ///
     /// - Parameter other: A parser to attempt if the first parser fails.
     /// - Returns: A parser that encapsulates the result of the first successful parser in an `Either` type.
-    public func either<B>(other: @escaping @autoclosure () -> IO.Parser<B>) -> IO.EitherParser<A, B> {
-        IO.Either.try(left: self, right: other())
+    public func either<B>(or: @escaping @autoclosure () -> IO.Parser<B>) -> IO.EitherParser<A, B> {
+        IO.Either.try(left: self, right: or())
     }
-    public func or(other: @escaping @autoclosure () -> IO.Parser<A>) -> IO.Parser<A> {
-        IO.Either.try(left: self, right: other()).map(IO.Either.unwrap(value:))
+    public func or(fallback: @escaping @autoclosure () -> IO.Parser<A>) -> IO.Parser<A> {
+        IO.Either.try(left: self, right: fallback()).map(IO.Either.unwrap(value:))
     }
     /// Marks the parser as optional, allowing it to succeed with a `nil` value if the underlying parser fails.
     ///

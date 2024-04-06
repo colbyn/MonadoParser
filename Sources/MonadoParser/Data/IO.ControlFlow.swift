@@ -17,13 +17,13 @@ extension IO {
 }
 
 extension IO.ControlFlow {
-    public var isContinue: Bool {
+    public var isNoop: Bool {
         switch self {
         case .noop: return true
         default: return false
         }
     }
-    public var isBreak: Bool {
+    public var isTerminate: Bool {
         switch self {
         case .terminate: return true
         default: return false
