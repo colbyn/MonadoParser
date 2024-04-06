@@ -47,7 +47,7 @@ extension IO.CharParser {
     /// This parser is useful when you need to consume a single character regardless of what it is, often used in scenarios where the specific character is not important or is handled dynamically.
     ///
     /// - Returns: A parser that consumes the next available character.
-    public static var next: IO.CharParser {
+    public static var head: IO.CharParser {
         Self {
             guard let (first, rest) = $0.text.uncons else {
                 return $0.break()

@@ -10,4 +10,6 @@ import Foundation
 /// The IO namespace.
 ///
 /// Essential  parser types are namespaced under IO
-public struct IO {}
+public struct IO {
+    public static let unit: IO.Unit = IO.Unit.unit
+}

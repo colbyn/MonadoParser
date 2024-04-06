@@ -9,6 +9,16 @@
 import Foundation
 
 extension IO.Parser {
+    /// Disregards the current value.
+    public var void: IO.UnitParser {
+        IO.UnitParser {
+            switch self.binder($0) {
+            case .continue(value: _, state: let rest):
+                return rest.continue(value: IO.unit)
+            case .break(state: let out): return out.break()
+            }
+        }
+    }
     /// Attempts to parse using each parser in the provided array, in order, stopping at the first success.
     ///
     /// - Parameter parsers: An array of parsers to be tried sequentially until one succeeds.
@@ -126,6 +136,53 @@ extension IO.Parser {
                 }
             }
         }
+    }
+    public func putBack(text: IO.Text?) -> Self {
+        if let text = text {
+            return Self {
+                let input = $0.set(text: IO.Text(flatten: [text, $0.text]))
+                switch self.binder(input) {
+                case .continue(value: let a, state: let state): return state.continue(value: a)
+                case .break(state: let state): return state.break()
+                }
+            }
+        }
+        return self
+    }
+    public func putBack(char: IO.Text.FatChar?) -> Self {
+        return self.putBack(text: char.map {.cons($0, .empty)})
+    }
+    public func manyUnless<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B?> {
+        let until = IO.ControlFlowParser.wrap(try: terminator())
+        let settings = IO.SequenceSettings(
+            allowEmpty: true,
+            until: { until }
+        )
+        return sequence(settings: settings).and(next: terminator().optional)
+    }
+    public func someUnless<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B?> {
+        let until = IO.ControlFlowParser.wrap(try: terminator())
+        let settings = IO.SequenceSettings(
+            allowEmpty: false,
+            until: { until }
+        )
+        return sequence(settings: settings).and(next: terminator().optional)
+    }
+    public func manyTill<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B> {
+        let until = IO.ControlFlowParser.wrap(try: terminator())
+        let settings = IO.SequenceSettings(
+            allowEmpty: true,
+            until: { until }
+        )
+        return sequence(settings: settings).and(next: terminator())
+    }
+    public func someTill<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B> {
+        let until = IO.ControlFlowParser.wrap(try: terminator())
+        let settings = IO.SequenceSettings(
+            allowEmpty: false,
+            until: { until }
+        )
+        return sequence(settings: settings).and(next: terminator())
     }
 }
 

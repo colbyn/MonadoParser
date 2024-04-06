@@ -14,7 +14,7 @@ extension IO {
         public func allowEmpty(_ flag: Bool) -> Self {
             Self(allowEmpty: flag, until: until)
         }
-        public func until(terminator: @escaping () -> IO.ControlFlowParser) -> Self {
+        public func until(terminator: @escaping @autoclosure () -> IO.ControlFlowParser) -> Self {
             Self(allowEmpty: allowEmpty, until: terminator)
         }
         public static var `default`: Self {
@@ -42,10 +42,6 @@ extension IO.Parser {
                 case .continue(value: let a, state: let rest):
                     current = rest
                     results.append(a)
-                    if counter >= 1000 {
-                        let type = "Parser<[\(type(of: A.self))]>.sequence"
-                        print("\(type) WARNING: TOO MANY ITERATIONS: LAST: \(a)")
-                    }
                     continue loop
                 case .break: break loop
                 }
@@ -56,11 +52,18 @@ extension IO.Parser {
             return current.continue(value: results)
         }
     }
-    public var some: IO.Parser<[A]> {
-        sequence(settings: IO.SequenceSettings(allowEmpty: false, until: .none))
-    }
+    /// Repeats parsing as many times as possible until a failure, returning an array of results.
+    ///
+    /// - Returns: A parser that collects zero or more results from the repeated application of itself.
     public var many: IO.Parser<[A]> {
         sequence(settings: IO.SequenceSettings(allowEmpty: true, until: .none))
+    }
+    /// Repeats parsing one or more times until a failure, returning an array of results.
+    ///
+    /// - Returns: A parser that collects one or more results from the repeated application of itself.
+    ///
+    public var some: IO.Parser<[A]> {
+        sequence(settings: IO.SequenceSettings(allowEmpty: false, until: .none))
     }
 }
 
