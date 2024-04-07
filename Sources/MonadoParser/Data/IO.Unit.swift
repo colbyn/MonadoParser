@@ -16,10 +16,6 @@ extension IO {
     public typealias UnitParser = Parser<Unit>
 }
 
-extension IO.UnitParser {
-    public static let unit = IO.UnitParser.pure(value: .unit)
-}
-
 // MARK: - DEBUG -
 extension IO.Unit: ToPrettyTree {
     public var asPrettyTree: PrettyTree {

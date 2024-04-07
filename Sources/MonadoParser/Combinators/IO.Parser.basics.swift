@@ -40,14 +40,14 @@ extension IO.Parser {
     ///
     /// - Parameter right: A parser to be executed after the current parser, whose result will be returned.
     /// - Returns: A parser that returns the result of the second parser if both parsers succeed; otherwise, it fails with the state of the first failure encountered.
-    public func keep<B>(right f: @escaping @autoclosure () -> IO.Parser<B>) -> IO.Parser<B> {
+    public func keep<B>(next f: @escaping @autoclosure () -> IO.Parser<B>) -> IO.Parser<B> {
         andThen { _ in f() }
     }
     /// Creates a parser that ignores the result of another parser applied after the current parser.
     ///
     /// - Parameter right: The parser whose result is to be ignored.
     /// - Returns: A parser that returns the result of the first parser while ignoring the result of the second.
-    public func ignore<B>(right f: @escaping @autoclosure () -> IO.Parser<B>) -> IO.Parser<A> {
+    public func ignore<B>(next f: @escaping @autoclosure () -> IO.Parser<B>) -> IO.Parser<A> {
         andThen { a in f().set(pure: a) }
     }
     /// Attempts to parse using the current parser, then applies another parser on the remaining input and combines their results.
@@ -79,12 +79,12 @@ extension IO.Parser {
     /// Creates a parser that results in an `Either` type, encapsulating the result of the first successful parser.
     ///
     /// - Parameter other: A parser to attempt if the first parser fails.
-    /// - Returns: A parser that encapsulates the result of the first successful parser in an `Either` type.
+    /// - Returns: A parser that encapsulates the result of the first successful parser in an `Either` type.1
     public func either<B>(or: @escaping @autoclosure () -> IO.Parser<B>) -> IO.EitherParser<A, B> {
         IO.Either.try(left: self, right: or())
     }
-    public func or(fallback: @escaping @autoclosure () -> IO.Parser<A>) -> IO.Parser<A> {
-        IO.Either.try(left: self, right: fallback()).map(IO.Either.unwrap(value:))
+    public func or(`try`: @escaping @autoclosure () -> IO.Parser<A>) -> IO.Parser<A> {
+        IO.Either.try(left: self, right: `try`()).map(IO.Either.unwrap(value:))
     }
     /// Marks the parser as optional, allowing it to succeed with a `nil` value if the underlying parser fails.
     ///
@@ -180,19 +180,31 @@ extension IO.Parser {
     ///
     /// - Returns: A parser that ignores trailing whitespace.
     public var spacedRight: IO.Parser<A> {
-        self.ignore(right: IO.TextParser.spaces.optional)
+        self.ignore(next: IO.TextParser.spaces.optional)
     }
     /// Creates a parser that ignores leading whitespace before parsing the value.
     ///
     /// - Returns: A parser that ignores leading whitespace.
     public var spacedLeft: IO.Parser<A> {
-        IO.TextParser.spaces.optional.keep(right: self)
+        IO.TextParser.spaces.optional.keep(next: self)
     }
     /// Creates a parser that ignores both leading and trailing whitespace around the parsed value.
     ///
     /// - Returns: A parser that ignores surrounding whitespace.
     public var spaced: IO.Parser<A> {
-        IO.TextParser.spaces.optional.keep(right: self).ignore(right: IO.TextParser.spaces.optional)
+        IO.TextParser.spaces.optional.keep(next: self).ignore(next: IO.TextParser.spaces.optional)
+    }
+    public func notFollowedBy<B>(_ parser: @autoclosure @escaping () -> IO.Parser<B>) -> IO.Parser<A> {
+        IO.Parser<A> {
+            switch self.binder($0) {
+            case .continue(value: let a, state: let state):
+                if case .break = parser().binder(state) {
+                    return state.continue(value: a)
+                }
+                return state.break()
+            case .break(state: let state): return state.break()
+            }
+        }
     }
 }
 

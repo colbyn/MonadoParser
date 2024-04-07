@@ -117,6 +117,55 @@ extension IO.Text {
         }
         return IO.Text.init(flatten: newLines)
     }
+    func forwardPartition(where predicate: (IO.Text.FatChar) -> Bool) -> IO.Tuple<IO.Text, IO.Text> {
+        var leading: [FatChar] = []
+        var trailing: [FatChar] = chars
+        loop: while let next = trailing.tryPopFirst() {
+            if predicate(next) {
+                leading.append(next)
+                continue loop
+            }
+            trailing.insert(next, at: 0)
+            break loop
+        }
+        return IO.Tuple(IO.Text(from: leading), IO.Text(from: trailing))
+    }
+    func backwardPartition(where predicate: (IO.Text.FatChar) -> Bool) -> IO.Tuple<IO.Text, IO.Text> {
+        var leading: [FatChar] = chars
+        var trailing: [FatChar] = []
+        loop: while let char = leading.tryPopLast() {
+            if predicate(char) {
+                trailing.insert(char, at: 0)
+                continue loop
+            }
+            leading.append(char)
+            break loop
+        }
+        return IO.Tuple(IO.Text(from: leading), IO.Text(from: trailing))
+    }
+    func trimLeading(includeNewlines: Bool = true) -> IO.Tuple<IO.Text, IO.Text> {
+        forwardPartition(
+            where: {
+                let isAnyWhitespace = $0.value.isWhitespace
+                let isSpace = $0.value.isWhitespace && !$0.value.isNewline
+                return includeNewlines ? isAnyWhitespace : isSpace
+            }
+        )
+    }
+    func trimTrailing(includeNewlines: Bool = true) -> IO.Tuple<IO.Text, IO.Text> {
+        backwardPartition(
+            where: {
+                let isAnyWhitespace = $0.value.isWhitespace
+                let isSpace = $0.value.isWhitespace && !$0.value.isNewline
+                return includeNewlines ? isAnyWhitespace : isSpace
+            }
+        )
+    }
+    func trim(includeNewlines: Bool = true) -> IO.Triple<IO.Text, IO.Text, IO.Text> {
+        let (leading, rest) = trimLeading(includeNewlines: includeNewlines).native
+        let (middle, trailing) = rest.trimTrailing(includeNewlines: includeNewlines).native
+        return IO.Triple(leading, middle, trailing)
+    }
 }
 
 extension IO.Text {
@@ -143,33 +192,6 @@ extension IO.Text: CustomDebugStringConvertible {
     }
 }
 
-extension IO.TextParser {
-    /// Creates a parser that consumes a specific string pattern from the input.
-    ///
-    /// This parser matches and consumes the exact sequence of characters defined by the given pattern. It's particularly useful for recognizing specific keywords, symbols, or other fixed sequences within a larger text stream.
-    ///
-    /// - Parameter pattern: The exact string sequence to match and consume.
-    /// - Returns: A parser that consumes the specified string pattern if it matches the beginning of the input.
-    ///
-    /// Example:
-    /// ```swift
-    /// let keywordParser = TapeParser.pop("func")
-    /// // Consumes the keyword "func" from the input, if present.
-    /// ```
-    public static func token(_ pattern: String) -> Self {
-        Self {
-            guard let (head, rest) = $0.text.split(prefix: pattern) else {
-                return $0.break()
-            }
-            return $0.set(text: rest).continue(value: head)
-        }
-    }
-    public static var spaces: Self {
-        IO.CharParser.char { $0.isWhitespace && !$0.isNewline }
-            .many
-            .map { IO.Text(from: $0) }
-    }
-}
 
 // MARK: - DEBUG -
 extension IO.Text: ToPrettyTree {

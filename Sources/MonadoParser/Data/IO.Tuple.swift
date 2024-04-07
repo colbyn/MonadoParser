@@ -40,6 +40,9 @@ extension IO.Tuple {
             }
         }
     }
+    public var native: (A, B) {
+        (self.a, self.b)
+    }
 }
 
 // MARK: - DEBUG -

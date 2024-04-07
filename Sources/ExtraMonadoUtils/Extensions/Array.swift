@@ -30,6 +30,10 @@ extension Array {
         guard !self.isEmpty else { return nil }
         return removeFirst()
     }
+    public mutating func tryPopLast() -> Element? {
+        guard !self.isEmpty else { return nil }
+        return removeLast()
+    }
 }
 
 extension Array where Element: Sequence {

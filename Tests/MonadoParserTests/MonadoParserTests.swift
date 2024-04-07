@@ -5,7 +5,7 @@ final class MonadoParserTests: XCTestCase {
     func testRandom1() throws {
         let sample = "Hello World!"
         let p1 = IO.TextParser.token("Hello World")
-        let p2 = IO.CharParser.head
+        let p2 = IO.CharParser.pop
         let p3 = p1.and(next: p2)
         let (result1, unparsed1) = p1.evaluate(source: sample)
         let (result2, unparsed2) = p2.evaluate(source: sample)
@@ -25,10 +25,9 @@ final class MonadoParserTests: XCTestCase {
         XCTAssertNotNil(result1); XCTAssertEqual(unparsed1.text.asString, " World!")
         XCTAssertNil(result2); XCTAssertEqual(unparsed2.text.asString, sample)
     }
-    
     func testRandom3() {
         let sample = "123"
-        let parser1 = IO.CharParser.head.and(next: IO.CharParser.head).andThen {
+        let parser1 = IO.CharParser.pop.and(next: IO.CharParser.pop).andThen {
             IO.UnitParser.unit
                 .putBack(char: $0.a)
                 .putBack(char: $0.b)
@@ -39,13 +38,66 @@ final class MonadoParserTests: XCTestCase {
     }
     func testRandom4() {
         let sample = """
-            > Line 1
-            > Line 2
-            > Line 3
+            - A1 Red
+              A2 Blue
+              A3 Green
+            - B1 Alpha
+              B2 Beta
+              B3 Gamma
             """
-//        let parser1 = IO.CharParser.next
-//        let (result1, unparsed1) = parser1.evaluate(source: sample)
-//        XCTAssertNotNil(result1)
-//        XCTAssertEqual(unparsed1.text.asString, "123")
+        let parser1 = IO.CharParser
+            .pop(char: "-")
+            .ignore(next: IO.CharParser.space)
+            .and(next: IO.TextParser.wholeIndentedBlock(deindent: true))
+            .ignore(next: IO.CharParser.newline)
+        let (result1, unparsed1) = parser1.evaluate(source: sample)
+        XCTAssertNotNil(result1)
+        XCTAssertEqual(
+            result1?.b.asString,
+            """
+            A1 Red
+            A2 Blue
+            A3 Green
+            """
+        )
+        XCTAssertEqual(
+            unparsed1.text.asString,
+            """
+            - B1 Alpha
+              B2 Beta
+              B3 Gamma
+            """
+        )
+    }
+    func testRandom5() {
+        let sample = """
+            > A1 Red
+            > A2 Blue
+            > A3 Green
+            
+            > B1 Alpha
+            > B2 Beta
+            > B3 Gamma
+            """
+        let parser1 = IO.UnitParser.lines(lineStart: IO.TextParser.token(">").ignore(next: IO.CharParser.space))
+        let (result1, unparsed1) = parser1.evaluate(source: sample)
+        XCTAssertNotNil(result1)
+        XCTAssertEqual(
+            result1?.content.asString,
+            """
+            A1 Red
+            A2 Blue
+            A3 Green
+            """
+        )
+        XCTAssertEqual(
+            unparsed1.text.asString,
+            """
+            \n
+            > B1 Alpha
+            > B2 Beta
+            > B3 Gamma
+            """
+        )
     }
 }
