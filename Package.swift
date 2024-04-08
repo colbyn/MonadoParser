@@ -7,12 +7,12 @@ let package = Package(
     name: "MonadoParser",
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
-        .library(name: "Monado", targets: ["Monado"]),
+//        .library(name: "Monado", targets: ["Monado"]),
         .library(name: "MonadoParser", targets: ["MonadoParser"]),
         .library(name: "MonadoMarkdown", targets: ["MonadoMarkdown"]),
         .library(name: "PrettyTree", targets: ["PrettyTree"]),
-        .library(name: "Markup", targets: ["Markup"]),
-        .library(name: "Markdown", targets: ["Markdown"]),
+//        .library(name: "Markup", targets: ["Markup"]),
+//        .library(name: "Markdown", targets: ["Markdown"]),
         .library(name: "ExtraMonadoUtils", targets: ["ExtraMonadoUtils"]),
     ],
     targets: [
@@ -20,10 +20,10 @@ let package = Package(
         // Targets can depend on other targets in this package and products from dependencies.
         .target(name: "PrettyTree", dependencies: ["ExtraMonadoUtils"]),
         .target(name: "ExtraMonadoUtils"),
-        .target(name: "Monado", dependencies: [ "PrettyTree", "ExtraMonadoUtils" ]),
+//        .target(name: "Monado", dependencies: [ "PrettyTree", "ExtraMonadoUtils" ]),
         .target(name: "MonadoParser", dependencies: [ "PrettyTree", "ExtraMonadoUtils" ]),
-        .target(name: "Markup", dependencies: [ "Monado", "ExtraMonadoUtils" ]),
-        .target(name: "Markdown", dependencies: [ "Monado", "ExtraMonadoUtils" ]),
+//        .target(name: "Markup", dependencies: [ "Monado", "ExtraMonadoUtils" ]),
+//        .target(name: "Markdown", dependencies: [ "Monado", "ExtraMonadoUtils" ]),
         .target(name: "MonadoMarkdown", dependencies: [ "MonadoParser", "ExtraMonadoUtils", "PrettyTree" ]),
         .executableTarget(name: "dev", dependencies: [ "MonadoParser", "PrettyTree", "ExtraMonadoUtils", "MonadoMarkdown" ]),
         .testTarget(name: "MonadoParserTests", dependencies: [ "MonadoParser", "PrettyTree", "ExtraMonadoUtils" ]),
