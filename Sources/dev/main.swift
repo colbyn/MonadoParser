@@ -66,21 +66,14 @@ fileprivate let source3 = """
     - 3.2
     - 3.3
 """
-let sample = """
-|----------|----------|----------|
-:--------| -----:|:--------:
-----------|:---------:| -------
------- | -----------
---------- | -------------- | ------
------------|-----------|--------------
-"""
+let sample = markdownSourceCodeExample6
 
 //let parser = IO.CharParser.pop
 //let parser = Mark.Inline.some(env: .root)
 //let parser = Mark.Inline.Emphasis.parser(env: .root)
 //let parser = Mark.Inline.PlainText.parser(env: .root.withScope(inline: .emphasis(.single("*"))))
 //let parser1 = Mark.some(env: .root)
-let parser = Mark.Block.Table.Row.parser(env: .root)
+let parser = Mark.some(env: .root)
 
 let (result, unparsed) = parser.evaluate(source: sample)
 if let result = result {

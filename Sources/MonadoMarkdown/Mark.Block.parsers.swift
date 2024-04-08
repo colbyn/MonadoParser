@@ -17,6 +17,7 @@ extension Mark.Block {
             Mark.Block.HorizontalRule.parser(env: env).map(Self.horizontalRule),
             Mark.Block.Blockquote.parser(env: env).map(Self.blockquote),
             Mark.Block.List.parser(env: env).map(Self.list),
+            Mark.Block.Table.parser(env: env).map(Self.table),
             Mark.Block.Paragraph.parser(env: env).map(Self.paragraph),
         ])
     }
@@ -243,12 +244,24 @@ extension Mark.Block.List.TaskItem {
 }
 extension Mark.Block.Table {
     public static func parser(env: Mark.Environment) -> IO.Parser<Self> {
-        fatalError("TODO")
+        let header = Mark.Block.Table.Header.parser(env: env)
+        let body = Mark.Block.Table.Row.parser(env: env).many
+        return IO.Tuple
+            .join(f: header, g: body)
+            .map {
+                Self(header: $0.a, data: $0.b)
+            }
     }
 }
 extension Mark.Block.Table.Header {
     public static func parser(env: Mark.Environment) -> IO.Parser<Self> {
-        fatalError("TODO")
+        let header = Mark.Block.Table.Row.parser(env: env)
+        let separator = Mark.Block.Table.SeperatorRow.parser(env: env)
+        return IO.Tuple
+            .join(f: header, g: separator)
+            .map {
+                Self(header: $0.a, separator: $0.b)
+            }
     }
 }
 extension Mark.Block.Table.SeperatorRow {
