@@ -24,6 +24,14 @@ public enum PrettyTree {
     public init(label: String, children: [PrettyTree]) {
         self = .branch(Branch(label: label, children: children))
     }
+    public init(label: String, children: [some ToPrettyTree]) {
+        let children = children.map { $0.asPrettyTree }
+        if children.count == 1 {
+            self = .init(key: label, value: children[0])
+            return
+        }
+        self = .branch(Branch(label: label, children: children.map({$0.asPrettyTree})))
+    }
     public init(value: String) {
         self = .value(value)
     }

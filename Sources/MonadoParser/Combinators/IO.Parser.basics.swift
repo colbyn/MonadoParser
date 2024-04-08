@@ -64,15 +64,15 @@ extension IO.Parser {
     ///   - g: The third parser to be executed.
     /// - Returns: A parser that combines the results of all three parsers into a triple.
     public func and2<B, C>(
-        _ f: @escaping @autoclosure () -> IO.Parser<B>,
-        _ g: @escaping @autoclosure () -> IO.Parser<C>
+        f: @escaping @autoclosure () -> IO.Parser<B>,
+        g: @escaping @autoclosure () -> IO.Parser<C>
     ) -> IO.TripleParser<A, B, C> {
         IO.Triple.join(f: self, g: f(), h: g())
     }
     public func and3<B, C, D>(
-        _ f: @escaping @autoclosure () -> IO.Parser<B>,
-        _ g: @escaping @autoclosure () -> IO.Parser<C>,
-        _ h: @escaping @autoclosure () -> IO.Parser<D>
+        f: @escaping @autoclosure () -> IO.Parser<B>,
+        g: @escaping @autoclosure () -> IO.Parser<C>,
+        h: @escaping @autoclosure () -> IO.Parser<D>
     ) -> IO.QuadrupleParser<A, B, C, D> {
         IO.Quadruple.join(f: self, g: f(), h: g(), i: h())
     }
@@ -143,39 +143,6 @@ extension IO.Parser {
     public func putBack(char: IO.Text.FatChar?) -> Self {
         return self.putBack(text: char.map {.cons($0, .empty)})
     }
-    public func manyUnless<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B?> {
-        let until = IO.ControlFlowParser.wrap(flip: terminator())
-        let settings = IO.SequenceSettings(
-            allowEmpty: true,
-            until: { until }
-        )
-        return sequence(settings: settings).and(next: terminator().optional)
-    }
-    public func someUnless<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B?> {
-        let until = IO.ControlFlowParser.wrap(flip: terminator())
-        let settings = IO.SequenceSettings(
-            allowEmpty: false,
-            until: { until }
-        )
-        return sequence(settings: settings).and(next: terminator().optional)
-    }
-    public func manyTill<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B> {
-        let until = IO.ControlFlowParser.wrap(flip: terminator())
-        let settings = IO.SequenceSettings(
-            allowEmpty: true,
-            until: { until }
-        )
-        return sequence(settings: settings).and(next: terminator())
-    }
-    public func someTill<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B> {
-        let until = IO.ControlFlowParser.wrap(flip: terminator())
-        let settings = IO.SequenceSettings(
-            allowEmpty: false,
-            until: { until }
-        )
-        return sequence(settings: settings).and(next: terminator())
-    }
-    
     /// Creates a parser that ignores trailing whitespace after parsing the value.
     ///
     /// - Returns: A parser that ignores trailing whitespace.
@@ -205,6 +172,12 @@ extension IO.Parser {
             case .break(state: let state): return state.break()
             }
         }
+    }
+    public func deactivate(if flag: Bool) -> Self {
+        if flag {
+            return Self.break
+        }
+        return self
     }
 }
 

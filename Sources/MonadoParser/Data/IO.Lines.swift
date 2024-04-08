@@ -10,8 +10,8 @@ import Foundation
 extension IO {
     public struct Lines<Prefix, Content> {
         /// The startings tokens of each line.
-        let lineStarts: [Prefix]
+        public let lineStarts: [Prefix]
         /// The parsed sub-content.
-        let content: Content
+        public let content: Content
     }
 }

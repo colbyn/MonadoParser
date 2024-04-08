@@ -25,3 +25,17 @@ extension Mark: ToPrettyTree {
         }
     }
 }
+
+extension Mark.Inline {
+    public static let reservedTokens: Set<String> = [
+        "[",
+        "]",
+        "(",
+        ")",
+        "*",
+        "_",
+        "=",
+        "~",
+        "`",
+    ]
+}

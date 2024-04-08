@@ -84,4 +84,61 @@ extension IO.UnitParser {
             }
         }
     }
+    public static func bounded<T>(
+        extract extractor: @escaping @autoclosure () -> IO.TextParser,
+        execute subparser: @escaping @autoclosure () -> IO.Parser<T>
+    ) -> IO.Parser<T> {
+        IO.Parser<T> {
+            guard case .continue(value: let leading, state: let trailing) = extractor().binder($0) else {
+                return $0.break()
+            }
+            let forkedState = trailing.set(text: leading)
+            guard case .continue(value: let value, state: let rest) = subparser().binder(forkedState) else {
+                return $0.break()
+            }
+            // FIND ORIGINAL STATE from `rest`
+            let unparsed1 = $0.text
+                .splitAt(
+                    whereTrue: {
+                        $0.index.character == rest.text.chars.first?.index.character
+                    }
+                )
+                .map {
+                    $0.b
+                }
+            let unparsed2 = unparsed1 ?? rest.text.with(append: trailing.text)
+            return rest
+                // Instead of returning a joined `Text` from `rest` + `trailing` we instead
+                // use `rest` to find the original characters where `rest` starts from.
+                .set(text: unparsed2)
+                .continue(value: value)
+        }
+    }
+    public static func boundedFork<T>(
+        text: IO.Text,
+        execute subparser: @escaping @autoclosure () -> IO.Parser<T>
+    ) -> IO.Parser<T> {
+        IO.Parser<T> {
+            let forkedState = $0.set(text: text)
+            guard case .continue(value: let value, state: let rest) = subparser().binder(forkedState) else {
+                return $0.break()
+            }
+            // FIND ORIGINAL STATE from `rest`
+            let unparsed1 = $0.text
+                .splitAt(
+                    whereTrue: {
+                        $0.index.character == rest.text.chars.first?.index.character
+                    }
+                )
+                .map {
+                    $0.b
+                }
+            let unparsed2 = (unparsed1 ?? IO.Text(from: [])).with(append: $0.text)
+            return rest
+                // Instead of returning a joined `Text` from `rest` + `trailing` we instead
+                // use `rest` to find the original characters where `rest` starts from.
+                .set(text: unparsed2)
+                .continue(value: value)
+        }
+    }
 }

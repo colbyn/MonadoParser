@@ -38,12 +38,10 @@ final class MonadoParserTests: XCTestCase {
         XCTAssertEqual(unparsed2.text.asString, "")
     }
     func testRandom2() throws {
-        let sample1 = "Alpha *Beta Gamma* Delta"
-        let sample2 = "Alpha **Beta Gamma** Delta"
-        let sample3 = "Alpha ***Beta Gamma*** Delta"
-        let parser = Mark.Inline.Emphasis.parser(env: .root)
+        let sample1 = "A ***B*** C A **B** C A *B* C A ___B___ C A __B__ C A _B_ C"
+        let parser = Mark.Inline.some(env: .root)
         let (result1, unparsed1) = parser.evaluate(source: sample1)
         XCTAssertNotNil(result1)
-//        XCTAssertEqual(result1?.content)
+        XCTAssertEqual(unparsed1.text.asString, "")
     }
 }

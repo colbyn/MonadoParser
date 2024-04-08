@@ -33,7 +33,7 @@ extension IO.Parser {
                 counter += 1
                 if counter >= 1000 {
                     let type = "Parser<[\(type(of: A.self))]>.sequence"
-                    print("\(type) WARNING: TOO MANY ITERATIONS")
+                    print("\(type) WARNING: TOO MANY ITERATIONS:")
                 }
                 if let until = settings.until, case .continue(value: .terminate, state: _) = until().binder(current) {
                     break loop
@@ -64,6 +64,38 @@ extension IO.Parser {
     ///
     public var some: IO.Parser<[A]> {
         sequence(settings: IO.SequenceSettings(allowEmpty: false, until: .none))
+    }
+    public func manyUnless<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B?> {
+        let until = IO.ControlFlowParser.wrap(flip: terminator())
+        let settings = IO.SequenceSettings(
+            allowEmpty: true,
+            until: { until }
+        )
+        return sequence(settings: settings).and(next: terminator().optional)
+    }
+    public func someUnless<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B?> {
+        let until = IO.ControlFlowParser.wrap(flip: terminator())
+        let settings = IO.SequenceSettings(
+            allowEmpty: false,
+            until: { until }
+        )
+        return sequence(settings: settings).and(next: terminator().optional)
+    }
+    public func manyTill<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B> {
+        let until = IO.ControlFlowParser.wrap(flip: terminator())
+        let settings = IO.SequenceSettings(
+            allowEmpty: true,
+            until: { until }
+        )
+        return sequence(settings: settings).and(next: terminator())
+    }
+    public func someTill<B>(terminator: @escaping @autoclosure () -> IO.Parser<B>) -> IO.TupleParser<[A], B> {
+        let until = IO.ControlFlowParser.wrap(flip: terminator())
+        let settings = IO.SequenceSettings(
+            allowEmpty: false,
+            until: { until }
+        )
+        return sequence(settings: settings).and(next: terminator())
     }
 }
 

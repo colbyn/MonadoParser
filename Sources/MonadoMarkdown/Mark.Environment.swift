@@ -17,13 +17,25 @@ extension Mark {
 }
 
 extension Mark.Environment {
-    public enum Scope {
-        case inline(Inline), block(Block), string
+    public enum Scope: Equatable {
+        case inline(Inline), block(Block)
+    }
+    public struct TokenGroup {
+        let tokens: Set<String>
+    }
+    public var avoidThese: [ TokenGroup ] {
+        var groups: [ TokenGroup ] = []
+        for scope in self.scopes {
+            if let group = scope.avoidThese {
+                groups.append(group)
+            }
+        }
+        return groups
     }
 }
 
 extension Mark.Environment.Scope {
-    public enum Inline {
+    public enum Inline: Equatable {
         case plainText
         case link(LinkPart)
         case emphasis(EmphasisType)
@@ -33,11 +45,11 @@ extension Mark.Environment.Scope {
         case sup
         case inlineCode(terminal: String)
         case latex(LatexType)
-        public enum LinkPart {
+        public enum LinkPart: Equatable {
             case inSquareBraces
             case inRoundBraces
         }
-        public enum EmphasisType {
+        public enum EmphasisType: Equatable {
             case single(Character)
             case double(Character)
             case triple(Character)
@@ -49,8 +61,12 @@ extension Mark.Environment.Scope {
                 }
             }
         }
+        public enum LatexType: Equatable {
+            case single(Character)
+            case double(Character)
+        }
     }
-    public enum Block {
+    public enum Block: Equatable {
         case heading
         case paragraph
         case blockquote
@@ -65,10 +81,6 @@ extension Mark.Environment.Scope {
         case table
         case tableRow
         case tableCell
-    }
-    public enum LatexType {
-        case single(Character)
-        case double(Character)
     }
 }
 
@@ -88,40 +100,51 @@ extension Mark.Environment {
             scopes: self.scopes.with(append: .block(scope))
         )
     }
-    public var inlineTerminators: IO.TextParser {
-        IO.Parser.options(self.scopes.last?.avoidThese.compactMap { IO.TextParser.token($0) } ?? [])
+    public func has(scope: Scope) -> Bool {
+        for scope in scopes {
+            if scope == scope {
+                return true
+            }
+        }
+        return false
     }
-    public var avoidThese: IO.ControlFlowParser {
-        IO.ControlFlowParser.wrap(flip: inlineTerminators)
+    public var inlineTerminators: IO.TextParser {
+        var group = Mark.Environment.TokenGroup(tokens: Mark.Inline.reservedTokens)
+        if let avoid = avoidThese.last {
+            group = Mark.Environment.TokenGroup(
+                tokens: group.tokens.union(avoid.tokens)
+            )
+        }
+        let tokens = Array(group.tokens)
+        return IO.Parser.options(tokens.map(IO.TextParser.token(_:)))
     }
 }
 
 
 extension Mark.Environment.Scope {
-    var avoidThese: Set<String> {
+    var avoidThese: Mark.Environment.TokenGroup? {
         switch self {
-        case .string: return ["\""]
         case .inline(let x): return x.avoidThese
-        case .block: return []
+        case .block: return nil
         }
     }
 }
 extension Mark.Environment.Scope.Inline {
-    var avoidThese: Set<String> {
+    var avoidThese: Mark.Environment.TokenGroup? {
         switch self {
-        case .plainText: return []
-        case .link(.inSquareBraces): return [ "]" ]
-        case .link(.inRoundBraces): return [ ")" ]
-        case .emphasis(.single(let x)): return [ "\(x)" ]
-        case .emphasis(.double(let x)): return [ "\(x)\(x)" ]
-        case .emphasis(.triple(let x)): return [ "\(x)\(x)\(x)" ]
-        case .highlight: return [ "==" ]
-        case .strikethrough: return [ "~~" ]
-        case .sub: return [ "~" ]
-        case .sup: return [ "^" ]
-        case .inlineCode(terminal: let x): return [ x ]
-        case .latex(.single(let x)): return [ "\(x)" ]
-        case .latex(.double(let x)): return [ "\(x)\(x)" ]
+        case .plainText: return nil
+        case .link(.inSquareBraces): return Mark.Environment.TokenGroup(tokens: [ "]" ])
+        case .link(.inRoundBraces): return Mark.Environment.TokenGroup(tokens: [ ")" ])
+        case .emphasis(.single(let x)): return Mark.Environment.TokenGroup(tokens: [ "\(x)" ])
+        case .emphasis(.double(let x)): return Mark.Environment.TokenGroup(tokens: [ "\(x)\(x)" ])
+        case .emphasis(.triple(let x)): return Mark.Environment.TokenGroup(tokens: [ "\(x)\(x)\(x)" ])
+        case .highlight: return Mark.Environment.TokenGroup(tokens: [ "==" ])
+        case .strikethrough: return Mark.Environment.TokenGroup(tokens: [ "~~" ])
+        case .sub: return Mark.Environment.TokenGroup(tokens: [ "~" ])
+        case .sup: return Mark.Environment.TokenGroup(tokens: [ "^" ])
+        case .inlineCode(terminal: let x): return Mark.Environment.TokenGroup(tokens: [ x ])
+        case .latex(.single(let x)): return Mark.Environment.TokenGroup(tokens: [ "\(x)" ])
+        case .latex(.double(let x)): return Mark.Environment.TokenGroup(tokens: [ "\(x)\(x)" ])
         }
     }
 }
@@ -154,7 +177,7 @@ extension Mark.Environment.Scope.Inline: ToPrettyTree {
         }
     }
 }
-extension Mark.Environment.Scope.LatexType: ToPrettyTree {
+extension Mark.Environment.Scope.Inline.LatexType: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
         switch self {
         case .single(let x): return .value("'\(x)'")

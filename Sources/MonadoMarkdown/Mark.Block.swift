@@ -15,11 +15,6 @@ extension Mark {
         case paragraph(Paragraph)
         case blockquote(Blockquote)
         case list(List)
-        case listItem(ListItem)
-        case unorderedListItem(UnorderedListItem)
-        case orderedListItem(OrderedListItem)
-        case taskList(TaskList)
-        case taskListItem(TaskListItem)
         case fencedCodeBlock(FencedCodeBlock)
         case horizontalRule(HorizontalRule)
         case table(Table)
@@ -35,34 +30,8 @@ extension Mark {
         }
         public struct Blockquote {
             /// The `>` character used to denote blockquotes
-            public let startDelimiter: Token
+            public let startDelimiters: [Token]
             /// Blockquotes can contain multiple other Markdown elements
-            public let content: [ Mark ]
-        }
-        public struct List {
-            public let items: [ ListItem ]
-        }
-        public enum ListItem {
-            case unordered(UnorderedListItem)
-            case ordered(OrderedListItem)
-        }
-        public struct UnorderedListItem {
-            /// Either `*`, `-`, `+`, or a number followed by `.`
-            public let bullet: Token
-            public let content: [ Mark ]
-        }
-        public struct OrderedListItem {
-            public let number: Token
-            public let dot: Token
-            public let content: [ Mark ]
-        }
-        public struct TaskList {
-            public let items: [ TaskListItem ]
-        }
-        public struct TaskListItem {
-            /// Represents the `[ ]` or `[x]` for task list items
-            public let header: Inline.InSquareBrackets<Token?>
-            /// Task list items can contain multiple other Markdown elements
             public let content: [ Mark ]
         }
         public struct FencedCodeBlock {
@@ -82,6 +51,31 @@ extension Mark {
         public struct Table {
             public let header: Header
             public let data: [ Row ]
+        }
+    }
+}
+
+extension Mark.Block {
+    public enum List {
+        case unordered(list: [UnorderedItem])
+        case ordered(list: [OrderedItem])
+        case task(list: [TaskItem])
+        public struct UnorderedItem {
+            /// Either `*`, `-`, `+`, or a number followed by `.`
+            public let bullet: Mark.Token.FatChar
+            public let content: [ Mark ]
+        }
+        public struct OrderedItem {
+            public let number: Mark.Token
+            public let dot: Mark.Token.FatChar
+            public let content: [ Mark ]
+        }
+        public struct TaskItem {
+            public let bullet: Mark.Token.FatChar
+            /// Represents the `[ ]` or `[x]` for task list items
+            public let header: Mark.Inline.InSquareBrackets<Mark.Token?>
+            /// Task list items can contain multiple other Markdown elements
+            public let content: [ Mark ]
         }
     }
 }
@@ -126,11 +120,6 @@ extension Mark.Block {
         case .paragraph(let x): return x.asPrettyTree
         case .blockquote(let x): return x.asPrettyTree
         case .list(let x): return x.asPrettyTree
-        case .listItem(let x): return x.asPrettyTree
-        case .unorderedListItem(let x): return x.asPrettyTree
-        case .orderedListItem(let x): return x.asPrettyTree
-        case .taskList(let x): return x.asPrettyTree
-        case .taskListItem(let x): return x.asPrettyTree
         case .fencedCodeBlock(let x): return x.asPrettyTree
         case .horizontalRule(let x): return x.asPrettyTree
         case .table(let x): return x.asPrettyTree
@@ -156,53 +145,41 @@ extension Mark.Block.Paragraph: ToPrettyTree {
 extension Mark.Block.Blockquote: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
         return PrettyTree(label: "Block.Blockquote", children: [
-            .init(key: "startDelimiter", value: startDelimiter),
+            .init(key: "startDelimiters", value: startDelimiters),
             .init(key: "content", value: content),
         ])
     }
 }
 extension Mark.Block.List: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
-        return PrettyTree(label: "Block.List", children: [
-            .init(key: "items", value: items)
-        ])
-    }
-}
-extension Mark.Block.ListItem: ToPrettyTree {
-    public var asPrettyTree: PrettyTree {
         switch self {
-        case .unordered(let x): return x.asPrettyTree
-        case .ordered(let x): return x.asPrettyTree
+        case .ordered(list: let xs): return .init(label: "Mark.Block.List.ordered", children: xs)
+        case .unordered(list: let xs): return .init(label: "Mark.Block.List.unordered", children: xs)
+        case .task(list: let xs): return .init(label: "Mark.Block.List.task", children: xs)
         }
     }
 }
-extension Mark.Block.UnorderedListItem: ToPrettyTree {
+extension Mark.Block.List.UnorderedItem: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
-        return PrettyTree(label: "Block.UnorderedListItem", children: [
+        return .init(label: "Mark.Block.List.UnorderedItem", children: [
             .init(key: "bullet", value: bullet),
             .init(key: "content", value: content),
         ])
     }
 }
-extension Mark.Block.OrderedListItem: ToPrettyTree {
+extension Mark.Block.List.OrderedItem: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
-        return PrettyTree(label: "Block.OrderedListItem", children: [
+        return .init(label: "Mark.Block.List.OrderedItem", children: [
             .init(key: "number", value: number),
             .init(key: "dot", value: dot),
             .init(key: "content", value: content),
         ])
     }
 }
-extension Mark.Block.TaskList: ToPrettyTree {
+extension Mark.Block.List.TaskItem: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
-        return PrettyTree(label: "Block.TaskList", children: [
-            .init(key: "items", value: items)
-        ])
-    }
-}
-extension Mark.Block.TaskListItem: ToPrettyTree {
-    public var asPrettyTree: PrettyTree {
-        return PrettyTree(label: "Block.TaskListItem", children: [
+        return .init(label: "Mark.Block.List.TaskItem", children: [
+            .init(key: "bullet", value: bullet),
             .init(key: "header", value: header),
             .init(key: "content", value: content),
         ])

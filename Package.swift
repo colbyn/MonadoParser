@@ -25,7 +25,7 @@ let package = Package(
         .target(name: "Markup", dependencies: [ "Monado", "ExtraMonadoUtils" ]),
         .target(name: "Markdown", dependencies: [ "Monado", "ExtraMonadoUtils" ]),
         .target(name: "MonadoMarkdown", dependencies: [ "MonadoParser", "ExtraMonadoUtils", "PrettyTree" ]),
-        .executableTarget(name: "dev", dependencies: [ "Monado", "Markup", "Markdown", "ExtraMonadoUtils" ]),
+        .executableTarget(name: "dev", dependencies: [ "MonadoParser", "PrettyTree", "ExtraMonadoUtils", "MonadoMarkdown" ]),
         .testTarget(name: "MonadoParserTests", dependencies: [ "MonadoParser", "PrettyTree", "ExtraMonadoUtils" ]),
         .testTarget(name: "MonadoMarkdownTests", dependencies: [ "MonadoParser", "PrettyTree", "ExtraMonadoUtils", "MonadoMarkdown" ]),
     ]

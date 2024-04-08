@@ -38,6 +38,11 @@ extension IO.TextParser {
             .many
             .map { IO.Text(from: $0) }
     }
+    public static var anyWhitespace: Self {
+        IO.CharParser.char { $0.isWhitespace }
+            .many
+            .map { IO.Text(from: $0) }
+    }
     /// A parser that consumes and returns the remainder of the current line, stopping at a newline character or end of input.
     ///
     /// This parser is valuable for scenarios where you need to capture entire lines of text, such as parsing log files, reading configuration entries, or processing command output. It effectively grabs all characters up to, but not including, the next newline character.

@@ -48,6 +48,9 @@ extension IO.Parser {
     public static var fail: Self {
         Self { $0.break() }
     }
+    public static var `break`: Self {
+        Self { $0.break() }
+    }
     /// Sequences two parsers, running the second parser after the first and combining their results.
     ///
     /// - Parameter f: A function that takes the result of the first parser and returns the second parser to execute.

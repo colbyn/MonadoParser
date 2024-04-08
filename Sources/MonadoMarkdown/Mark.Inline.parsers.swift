@@ -11,42 +11,46 @@ import MonadoParser
 extension Mark.Inline {
     public static func parser(env: Mark.Environment) -> IO.Parser<Self> {
         IO.Parser.options([
-            Mark.Inline.PlainText.parser(env: env).map(Mark.Inline.plainText),
-            Mark.Inline.Link.parser(env: env).map(Mark.Inline.link),
             Mark.Inline.Image.parser(env: env).map(Mark.Inline.image),
+            Mark.Inline.Link.parser(env: env).map(Mark.Inline.link),
             Mark.Inline.Emphasis.parser(env: env).map(Mark.Inline.emphasis),
+            Mark.Inline.Link.parser(env: env).map(Self.link),
+            Mark.Inline.Image.parser(env: env).map(Self.image),
+            Mark.Inline.Highlight.parser(env: env).map(Self.highlight),
+            Mark.Inline.Strikethrough.parser(env: env).map(Self.strikethrough),
+            Mark.Inline.Subscript.parser(env: env).map(Self.sub),
+            Mark.Inline.Superscript.parser(env: env).map(Self.sup),
+            Mark.Inline.InlineCode.parser(env: env).map(Self.inlineCode),
+            Mark.Inline.PlainText.parser(env: env).map(Mark.Inline.plainText),
         ])
     }
     public static func many(env: Mark.Environment) -> IO.Parser<[Self]> {
-        let terminal = env.inlineTerminators
-        let parser = Mark.Inline.parser(env: env).sequence(
-            settings: .default
-                .allowEmpty(false)
-                .until(terminator: IO.ControlFlowParser.wrap(flip: terminal))
-        )
-        return parser
-    }
-    public static func some(env: Mark.Environment) -> IO.Parser<[Self]> {
-        let terminal = env.inlineTerminators
-        let parser = Mark.Inline.parser(env: env).sequence(
-            settings: .default
-                .allowEmpty(false)
-                .until(terminator: IO.ControlFlowParser.wrap(flip: terminal))
-        )
-        return parser
-    }
-    public static func painTextParser(env: Mark.Environment) -> IO.TextParser {
-        let terminal = env.inlineTerminators
-        let results = IO.CharParser.pop.sequence(
+        let terminator = IO.TextParser.token("\n\n")
+        return Mark.Inline.parser(env: env).sequence(
             settings: .default
                 .allowEmpty(true)
+                .until(terminator: IO.ControlFlowParser.wrap(flip: terminator))
+        )
+    }
+    public static func some(env: Mark.Environment) -> IO.Parser<[Self]> {
+        let terminator = IO.TextParser.token("\n\n")
+        return Mark.Inline.parser(env: env).sequence(
+            settings: .default
+                .allowEmpty(false)
+                .until(terminator: IO.ControlFlowParser.wrap(flip: terminator))
+        )
+    }
+    public static func painTextParser(env: Mark.Environment) -> IO.TextParser {
+        let terminal = env.inlineTerminators.or(try: IO.TextParser.token("\n"))
+        let results = IO.CharParser.pop.sequence(
+            settings: .default
+                .allowEmpty(false)
                 .until(terminator: IO.ControlFlowParser.wrap(flip: terminal))
         )
         return results.map(IO.Text.init(from:))
     }
     public static var lineBreak: IO.Parser<Self> {
         IO.CharParser.newline
-            .map(IO.Text.init(singleton:))
             .map(Mark.Inline.lineBreak)
     }
 }
@@ -101,12 +105,11 @@ extension Mark.Inline.Emphasis {
         let pack: (Mark.Environment.Scope.Inline.EmphasisType) -> IO.Parser<Self> = { type in
             let env = env.withScope(inline: .emphasis(type))
             let content = Mark.Inline.many(env: env)
-            let parser = content
+            return content
                 .between(bothEnds: IO.TextParser.token(type.asString))
                 .map {
                     Self(startDelimiter: $0.a, content: $0.b, endDelimiter: $0.c)
                 }
-            return parser
         }
         return IO.Parser.options([
             pack(.triple("*")), // `***`
@@ -120,27 +123,65 @@ extension Mark.Inline.Emphasis {
 }
 extension Mark.Inline.Highlight {
     public static func parser(env: Mark.Environment) -> IO.Parser<Self> {
-        fatalError("TODO")
+        let env = env.withScope(inline: .highlight)
+        let content = Mark.Inline.many(env: env)
+        return content
+            .between(bothEnds: IO.TextParser.token("=="))
+            .map {
+                Self(startDelimiter: $0.a, content: $0.b, endDelimiter: $0.c)
+            }
     }
 }
 extension Mark.Inline.Strikethrough {
     public static func parser(env: Mark.Environment) -> IO.Parser<Self> {
-        fatalError("TODO")
+        let env = env.withScope(inline: .strikethrough)
+        let content = Mark.Inline.many(env: env)
+        return content
+            .between(bothEnds: IO.TextParser.token("~~"))
+            .map {
+                Self(startDelimiter: $0.a, content: $0.b, endDelimiter: $0.c)
+            }
     }
 }
 extension Mark.Inline.Subscript {
     public static func parser(env: Mark.Environment) -> IO.Parser<Self> {
-        fatalError("TODO")
+        let env = env.withScope(inline: .sub)
+        let content = Mark.Inline.many(env: env)
+        return content
+            .between(bothEnds: IO.TextParser.token("~"))
+            .map {
+                Self(startDelimiter: $0.a, content: $0.b, endDelimiter: $0.c)
+            }
     }
 }
 extension Mark.Inline.Superscript {
     public static func parser(env: Mark.Environment) -> IO.Parser<Self> {
-        fatalError("TODO")
+        let env = env.withScope(inline: .sub)
+        let content = Mark.Inline.many(env: env)
+        return content
+            .between(bothEnds: IO.TextParser.token("^"))
+            .map {
+                Self(startDelimiter: $0.a, content: $0.b, endDelimiter: $0.c)
+            }
     }
 }
 extension Mark.Inline.InlineCode {
     public static func parser(env: Mark.Environment) -> IO.Parser<Self> {
-        fatalError("TODO")
+        let pack: (String) -> IO.Parser<Self> = {
+            let token = IO.TextParser.token($0)
+            let rest = IO.CharParser.pop
+                .manyTill(terminator: token)
+                .map {
+                    $0.mapA(IO.Text.init(from:))
+                }
+            return IO.Tuple.join(f: token, g: rest).map {
+                Self(startDelimiter: $0.a, content: $0.b.a, endDelimiter: $0.b.b)
+            }
+        }
+        return IO.Parser.options([
+            pack("``"),
+            pack("`"),
+        ])
     }
 }
 extension Mark.Inline.InDoubleQuotes {
@@ -150,7 +191,7 @@ extension Mark.Inline.InDoubleQuotes {
         parser()
             .between(bothEnds: IO.CharParser.pop(char: "\""))
             .map {
-                Self(openQuote: $0.a, content: $0.b, closeQuote: $0.c)
+                Self(startDelimiter: $0.a, content: $0.b, endDelimiter: $0.c)
             }
     }
 }
@@ -161,7 +202,7 @@ extension Mark.Inline.InSquareBrackets {
         parser()
             .between(leading: IO.CharParser.pop(char: "["), trailing: IO.CharParser.pop(char: "]"))
             .map {
-                Self(openSquareBracket: $0.a, content: $0.b, closeSquareBracket: $0.c)
+                Self(openDelimiter: $0.a, content: $0.b, closeDelimiter: $0.c)
             }
     }
 }

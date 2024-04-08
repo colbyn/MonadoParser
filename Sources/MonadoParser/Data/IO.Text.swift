@@ -130,6 +130,19 @@ extension IO.Text {
         }
         return IO.Tuple(IO.Text(from: leading), IO.Text(from: trailing))
     }
+    func splitAt(whereTrue predicate: (IO.Text.FatChar) -> Bool) -> IO.Tuple<IO.Text, IO.Text>? {
+        var leading: [FatChar] = []
+        var trailing: [FatChar] = chars
+        loop: while let next = trailing.tryPopFirst() {
+            if predicate(next) {
+                trailing.insert(next, at: 0)
+                return IO.Tuple(IO.Text(from: leading), IO.Text(from: trailing))
+            }
+            leading.append(next)
+            continue loop
+        }
+        return nil
+    }
     func backwardPartition(where predicate: (IO.Text.FatChar) -> Bool) -> IO.Tuple<IO.Text, IO.Text> {
         var leading: [FatChar] = chars
         var trailing: [FatChar] = []

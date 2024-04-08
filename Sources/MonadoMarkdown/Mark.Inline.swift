@@ -21,7 +21,7 @@ extension Mark {
         case sup(Superscript)
         case inlineCode(InlineCode)
         case latex(Latex)
-        case lineBreak(Token)
+        case lineBreak(Token.FatChar)
         case raw(Text)
         public struct PlainText {
             public let value: Text
@@ -74,30 +74,30 @@ extension Mark {
         public struct InlineCode {
             /// One or more backticks.
             public let startDelimiter: Token
-            public let content: Token.FatChar
+            public let content: Text
             /// One or more backticks; matching the `startDelimiter`.
             public let endDelimiter: Token
         }
         public struct InDoubleQuotes<Content> {
-            public let openQuote: Token.FatChar
+            public let startDelimiter: Token.FatChar
             public let content: Content
-            public let closeQuote: Token.FatChar
+            public let endDelimiter: Token.FatChar
         }
         public struct InSquareBrackets<Content> {
-            public let openSquareBracket: Token.FatChar
+            public let openDelimiter: Token.FatChar
             public let content: Content
-            public let closeSquareBracket: Token.FatChar
+            public let closeDelimiter: Token.FatChar
             public func map<Result>(_ function: @escaping (Content) -> Result) -> InSquareBrackets<Result> {
-                InSquareBrackets<Result>(openSquareBracket: openSquareBracket, content: function(content), closeSquareBracket: closeSquareBracket)
+                InSquareBrackets<Result>(openDelimiter: openDelimiter, content: function(content), closeDelimiter: closeDelimiter)
             }
         }
         public struct Latex {
             /// Either a single dollar sign (`$`) or double dollar signs (`$$`).
-            public let start: Token
+            public let startDelimiter: Token
             /// The Tex/LaTeX literal content.
             public let content: Text
             /// Either a single dollar sign (`$`) or double dollar signs (`$$`); matching the start token.
-            public let close: Token
+            public let endDelimiter: Token
         }
     }
 }
@@ -193,36 +193,36 @@ extension Mark.Inline.Superscript: ToPrettyTree {
 extension Mark.Inline.InlineCode: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
         return PrettyTree(label: "Inline.InlineCode", children: [
-            .init(key: "startBacktick", value: startDelimiter),
+            .init(key: "startDelimiter", value: startDelimiter),
             .init(key: "content", value: content),
-            .init(key: "endBacktick", value: endDelimiter),
+            .init(key: "endDelimiter", value: endDelimiter),
         ])
     }
 }
 extension Mark.Inline.Latex: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
         .init(label: "Latex", children: [
-            .init(key: "start", value: start),
+            .init(key: "startDelimiter", value: startDelimiter),
             .init(key: "content", value: content),
-            .init(key: "close", value: close),
+            .init(key: "endDelimiter", value: endDelimiter),
         ])
     }
 }
 extension Mark.Inline.InDoubleQuotes: ToPrettyTree where Content: ToPrettyTree {
     public var asPrettyTree: PrettyTree {
         .init(label: "Inline.InDoubleQuotes", children: [
-            .init(key: "openQuote", value: openQuote),
+            .init(key: "startDelimiter", value: startDelimiter),
             .init(key: "content", value: content),
-            .init(key: "closeQuote", value: closeQuote),
+            .init(key: "endDelimiter", value: endDelimiter),
         ])
     }
 }
 extension Mark.Inline.InSquareBrackets: ToPrettyTree where Content: ToPrettyTree {
      public var asPrettyTree: PrettyTree {
          .init(label: "Inline.InSquareBrackets", children: [
-            .init(key: "openSquareBracket", value: openSquareBracket),
+            .init(key: "openDelimiter", value: openDelimiter),
             .init(key: "content", value: content),
-            .init(key: "closeSquareBracket", value: closeSquareBracket),
+            .init(key: "closeDelimiter", value: closeDelimiter),
          ])
      }
  }

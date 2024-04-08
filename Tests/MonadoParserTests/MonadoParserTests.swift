@@ -34,7 +34,7 @@ final class MonadoParserTests: XCTestCase {
         }
         let (result1, unparsed1) = parser1.evaluate(source: sample)
         XCTAssertNotNil(result1)
-        XCTAssertEqual(unparsed1.text.asString, "123")
+        XCTAssertEqual(unparsed1.text.asString, "123") // Should this instead be "213"?
     }
     func testRandom4() {
         let sample = """
@@ -99,5 +99,31 @@ final class MonadoParserTests: XCTestCase {
             > B3 Gamma
             """
         )
+    }
+    func testRandom6() {
+        let sample = """
+            - Boil water in a kettle.
+              - Use filtered water for a better taste.
+            - Place a tea bag in your cup.
+              - Green tea for a lighter flavor.
+              - Black tea for a stronger flavor.
+            - Pour boiling water into the cup.
+            - Let the tea steep for 3-5 minutes.
+              - 3 minutes for a lighter taste.
+              - 5 minutes for a stronger brew.
+            - Enjoy your tea.
+              - Add honey or lemon if desired.
+            1. Boil water in a kettle.
+                - Use filtered water for a better taste.
+            2. Place a tea bag in your cup.
+                - Green tea for a lighter flavor.
+                - Black tea for a stronger flavor.
+            3. Pour boiling water into the cup.
+            4. Let the tea steep for 3-5 minutes.
+                - 3 minutes for a lighter taste.
+                - 5 minutes for a stronger brew.
+            5. Enjoy your tea.
+                - Add honey or lemon if desired.
+            """
     }
 }
